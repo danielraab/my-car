@@ -6,7 +6,6 @@ full-stack app; the legacy code is no longer in the tree and remains
 available in git history (vendored in commit `bbd18eb`).
 
 [![License: GPLv3](https://img.shields.io/github/license/danielraab/my-cars)](LICENSE)
-![Status](https://img.shields.io/badge/status-rewrite--in--progress-yellow)
 ![Go](https://img.shields.io/badge/backend-Go-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/frontend-React-149ECA?logo=react&logoColor=white)
 ![pnpm](https://img.shields.io/badge/package_manager-pnpm-F69220?logo=pnpm&logoColor=white)
