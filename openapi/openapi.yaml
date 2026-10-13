@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: my-car API
-  version: 2.1.0
+  version: 2.2.0
   description: REST API for the my-car rewrite.
   license:
     name: GPL-3.0-only

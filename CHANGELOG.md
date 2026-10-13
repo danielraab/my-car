@@ -7,6 +7,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-13
+
+### Added
+
+- **Car deregistration**: a car can carry an optional deregistration date. A
+  car whose date is today or earlier counts as deregistered and is no longer
+  offered on the dashboard cards, in the dashboard car selector, or in the car
+  pickers and filters of cars, refuels, repairs and tickets. Its cars-list row
+  and all linked entries stay visible. A deregistration date earlier than the
+  first registration is rejected. Database migration `000007` adds the column.
+- **Active switch**: the existing `isActive` flag is now editable on the car
+  create and edit forms (on by default) and shown on the car detail screen. It
+  is independent of the deregistration date.
+- **Car information**: a car can hold a free-form multi-line text, editable on
+  the car forms and shown on the detail screen.
+- **State badges**: rows of a car that is inactive or deregistered are muted
+  and carry a text badge, in the cars list and in the refuel, repair and ticket
+  lists.
+- README: how to run the backend tests (with and without a database) and the
+  frontend tests, type check, lint and API-schema check.
+
+### Changed
+
+- Dropped the "rewrite in progress" status badge from the README.
+
 ## [2.1.0] - 2026-10-08
 
 ### Added
@@ -77,6 +102,7 @@ app is kept in `old/` as reference only.
   inventories every legacy screen, endpoint and derived value as the
   acceptance criterion for the rewrite.
 
-[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/danielraab/my-cars/releases/tag/v2.2.0
 [2.1.0]: https://github.com/danielraab/my-cars/releases/tag/v2.1.0
 [2.0.0]: https://github.com/danielraab/my-cars/releases/tag/v2.0.0

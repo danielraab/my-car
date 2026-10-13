@@ -1,1 +1,6 @@
 /dump.sql
+
+# Local environment files (backend/.env.example stays tracked as the template)
+.env
+.env.*
+!.env.example
