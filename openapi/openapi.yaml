@@ -1138,8 +1138,9 @@ components:
             `required` (a required member is missing), `empty` (a string is
             blank after trimming), `invalid_enum` (not one of the documented
             codes), `invalid_date` (not an RFC 3339 full-date),
-            `invalid_decimal` (not a decimal string), and `negative` (a
-            numeric value below zero).
+            `invalid_decimal` (not a decimal string), `negative` (a
+            numeric value below zero), and `before_first_registration` (a
+            deregistration date earlier than the car's first registration).
           additionalProperties:
             type: string
     Profile:
@@ -1354,6 +1355,20 @@ components:
           format: date
         purchasePrice:
           $ref: '#/components/schemas/NullableDecimal'
+        deregistrationDate:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Date the car was deregistered; it must not be earlier
+            than `firstRegistration` when both are recorded
+            (`before_first_registration`). Independent of `isActive`.
+        information:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Free-form, possibly multi-line notes about the car.
     CarUpdate:
       type: object
       additionalProperties: false
@@ -1394,11 +1409,26 @@ components:
           format: date
         purchasePrice:
           $ref: '#/components/schemas/NullableDecimal'
+        deregistrationDate:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Date the car was deregistered; it must not be earlier
+            than `firstRegistration` when both are recorded
+            (`before_first_registration`). Independent of `isActive`.
+        information:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Free-form, possibly multi-line notes about the car.
     Car:
       type: object
       description: A car. Every member is always present;
-        `firstRegistration`, `licensePlate`, `fin`, `purchaseDate`, and
-        `purchasePrice` are `null` when not recorded.
+        `firstRegistration`, `licensePlate`, `fin`, `purchaseDate`,
+        `purchasePrice`, `deregistrationDate`, and `information` are `null`
+        when not recorded.
       required:
       - id
       - type
@@ -1411,6 +1441,8 @@ components:
       - isActive
       - purchaseDate
       - purchasePrice
+      - deregistrationDate
+      - information
       - createdAt
       - updatedAt
       properties:
@@ -1451,6 +1483,20 @@ components:
           format: date
         purchasePrice:
           $ref: '#/components/schemas/NullableDecimal'
+        deregistrationDate:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Date the car was deregistered; it must not be earlier
+            than `firstRegistration` when both are recorded
+            (`before_first_registration`). Independent of `isActive`.
+        information:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Free-form, possibly multi-line notes about the car.
         createdAt:
           type: string
           format: date-time

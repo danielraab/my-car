@@ -1,3 +1,4 @@
+import { Description, Field, Label, Switch } from '@headlessui/react'
 import { LoaderCircle, Save } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,15 +21,22 @@ type Values = {
   fin: string
   purchaseDate: string
   purchasePrice: string
+  isActive: boolean
+  deregistrationDate: string
+  information: string
 }
 
 type FieldName = keyof Values
 
+// Keeps a typed text in step with the backend's limit on information.
+const maxInformationLength = 2000
+
 const fields: {
   name: FieldName
-  kind: 'text' | 'date' | 'select' | 'decimal'
+  kind: 'text' | 'date' | 'select' | 'decimal' | 'switch' | 'textarea'
   optional?: boolean
   hint?: boolean
+  wide?: boolean
 }[] = [
   { name: 'type', kind: 'text', hint: true },
   { name: 'make', kind: 'text' },
@@ -39,6 +47,9 @@ const fields: {
   { name: 'fin', kind: 'text', optional: true },
   { name: 'purchaseDate', kind: 'date', optional: true },
   { name: 'purchasePrice', kind: 'decimal', optional: true, hint: true },
+  { name: 'isActive', kind: 'switch', hint: true },
+  { name: 'deregistrationDate', kind: 'date', optional: true, hint: true },
+  { name: 'information', kind: 'textarea', optional: true, wide: true },
 ]
 
 const knownReasons = new Set([
@@ -49,6 +60,8 @@ const knownReasons = new Set([
   'invalid_decimal',
   'negative',
   'invalid_type',
+  'too_long',
+  'before_first_registration',
 ])
 
 function initialValues(car?: Car): Values {
@@ -62,7 +75,20 @@ function initialValues(car?: Car): Values {
     fin: car?.fin ?? '',
     purchaseDate: car?.purchaseDate ?? '',
     purchasePrice: car?.purchasePrice ?? '',
+    isActive: car?.isActive ?? true,
+    deregistrationDate: car?.deregistrationDate ?? '',
+    information: car?.information ?? '',
   }
+}
+
+// Mirrors the backend's check, so the user is told before submitting.
+// Full-dates order lexically.
+function dateOrderReasons(values: Values): Record<string, string> {
+  const first = values.firstRegistration.trim()
+  const deregistration = values.deregistrationDate.trim()
+  return first !== '' && deregistration !== '' && deregistration < first
+    ? { deregistrationDate: 'before_first_registration' }
+    : {}
 }
 
 function optional(value: string): string | null {
@@ -87,6 +113,9 @@ function toInput(values: Values): CarInput {
     fin: optional(values.fin),
     purchaseDate: optional(values.purchaseDate),
     purchasePrice: purchasePrice === null ? null : decimal(purchasePrice),
+    isActive: values.isActive,
+    deregistrationDate: optional(values.deregistrationDate),
+    information: optional(values.information),
   }
 }
 
@@ -113,30 +142,66 @@ export function CarForm({
 }: CarFormProps) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() => initialValues(car))
+  const [localReasons, setLocalReasons] = useState<Record<string, string>>({})
 
-  const reasons =
-    error instanceof ApiError && error.status === 400
+  const reasons = {
+    ...(error instanceof ApiError && error.status === 400
       ? (error.fields ?? {})
-      : {}
+      : {}),
+    ...localReasons,
+  }
   const invalidFields = fields
     .map((field) => field.name)
     .filter((name) => reasons[name])
-  const formError = error !== null && invalidFields.length === 0
+  const formError =
+    error !== null &&
+    Object.keys(localReasons).length === 0 &&
+    invalidFields.length === 0
 
   function change<Name extends FieldName>(name: Name, value: Values[Name]) {
     setValues((current) => ({ ...current, [name]: value }))
+    setLocalReasons({})
     onEdit()
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const dateReasons = dateOrderReasons(values)
+    setLocalReasons(dateReasons)
+    if (Object.keys(dateReasons).length > 0) return
     onSubmit(toInput(values))
   }
 
   return (
     <form className="form-card" noValidate onSubmit={submit}>
       <div className="form-grid">
-        {fields.map(({ name, kind, optional: isOptional, hint }) => {
+        {fields.map(({ name, kind, optional: isOptional, hint, wide }) => {
+          if (name === 'isActive') {
+            return (
+              <Field className="form-field" key={name}>
+                <Label>{t('cars.fields.isActive')}</Label>
+                <div className="switch-row">
+                  <Switch
+                    className="switch"
+                    checked={values.isActive}
+                    onChange={(checked) => change('isActive', checked)}
+                  >
+                    <span className="switch-thumb" aria-hidden="true" />
+                  </Switch>
+                  <span aria-hidden="true">
+                    {t(
+                      values.isActive
+                        ? 'cars.states.active'
+                        : 'cars.states.inactive',
+                    )}
+                  </span>
+                </div>
+                <Description className="field-hint">
+                  {t('cars.hints.isActive')}
+                </Description>
+              </Field>
+            )
+          }
           const id = `car-${name}`
           const invalid = invalidFields.includes(name)
           const hintId = hint ? `${id}-hint` : undefined
@@ -150,7 +215,10 @@ export function CarForm({
             'aria-describedby': describedBy || undefined,
           }
           return (
-            <div className="form-field" key={name}>
+            <div
+              className={wide ? 'form-field form-field-wide' : 'form-field'}
+              key={name}
+            >
               <label htmlFor={id}>
                 {t(`cars.fields.${name}`)}
                 {isOptional ? (
@@ -178,6 +246,13 @@ export function CarForm({
                       </option>
                     ))}
                   </select>
+                ) : kind === 'textarea' ? (
+                  <textarea
+                    {...common}
+                    maxLength={maxInformationLength}
+                    value={values[name]}
+                    onChange={(event) => change(name, event.target.value)}
+                  />
                 ) : (
                   <input
                     {...common}

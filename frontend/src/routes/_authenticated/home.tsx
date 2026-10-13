@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { expenseKinds } from '#/api/client'
+import { isDeregistered } from '#/cars/deregistration'
 import { formatAmount } from '#/cars/format'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { CarSelect } from '#/components/car-select'
@@ -60,6 +61,9 @@ function DashboardPage() {
       search: (previous) => ({ ...previous, ...change }),
     })
   const cars = useQuery(allCarsQueryOptions)
+  // Only the cards leave deregistered cars out; "all cars" statistics keep
+  // including them.
+  const cardCars = cars.data?.items.filter((car) => !isDeregistered(car)) ?? []
   const statistics = useQuery(
     expenseStatisticsQueryOptions({
       ...(carId ? { carId } : {}),
@@ -91,10 +95,10 @@ function DashboardPage() {
         </div>
       </header>
 
-      {cars.data && cars.data.items.length > 0 ? (
+      {cardCars.length > 0 ? (
         <section className="dashboard-cars" aria-label={t('dashboard.cars')}>
           <ul>
-            {cars.data.items.map((car) => {
+            {cardCars.map((car) => {
               const Icon = carIcon(car.type)
               return (
                 <li key={car.id}>

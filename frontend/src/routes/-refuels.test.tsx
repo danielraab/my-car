@@ -24,6 +24,8 @@ const car: Car = {
   isActive: true,
   purchaseDate: null,
   purchasePrice: null,
+  deregistrationDate: null,
+  information: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 }
@@ -54,7 +56,7 @@ function query(calls: string[], path: string) {
     ? undefined
     : Object.fromEntries(new URLSearchParams(call.split('?')[1]))
 }
-function backend(refuels: Refuel[] = [refuel]) {
+function backend(refuels: Refuel[] = [refuel], cars: Car[] = [car]) {
   const calls: string[] = []
   vi.stubGlobal(
     'fetch',
@@ -63,7 +65,7 @@ function backend(refuels: Refuel[] = [refuel]) {
       calls.push(call)
       if (path === '/api/v1/session') return response({ profile })
       if (path === '/api/v1/cars?limit=100')
-        return response({ items: [car], nextCursor: null })
+        return response({ items: cars, nextCursor: null })
       if (path === '/api/v1/refuels/stations') return response([])
       if (path.startsWith('/api/v1/refuels/chart'))
         return response({ items: refuels })
@@ -216,5 +218,91 @@ describe('refuels', () => {
     expect(
       await screen.findByRole('heading', { name: 'Tankvorgänge' }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('refuels of inactive and deregistered cars', () => {
+  const inactive: Car = {
+    ...car,
+    id: '3f1e8a52-7c2b-4d0e-9a61-5b4c3d2e1f00',
+    make: 'Renault',
+    name: 'Zoe',
+    isActive: false,
+  }
+  const sold: Car = {
+    ...car,
+    id: 'c7d2e0a4-1b3f-4e5a-8c6d-7e8f9a0b1c2d',
+    make: 'Ford',
+    name: 'Ka',
+    deregistrationDate: '2020-01-01',
+  }
+  const cars = [car, inactive, sold]
+  const entries: Refuel[] = [
+    refuel,
+    {
+      ...refuel,
+      id: '44444444-4444-4444-4444-444444444444',
+      carId: inactive.id,
+    },
+    {
+      ...refuel,
+      id: '55555555-5555-5555-5555-555555555555',
+      carId: sold.id,
+      station: 'Ford station',
+    },
+  ]
+  const carOptions = (label: string) =>
+    within(screen.getByLabelText(label))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+
+  it('lists every refuel, muting and badging those of such cars', async () => {
+    backend(entries, cars)
+    renderApp('/refuels')
+
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    const rows = within(table).getAllByRole('row').slice(1, 4)
+    expect(rows.map((row) => row.classList.contains('row-muted'))).toEqual([
+      false,
+      true,
+      true,
+    ])
+    expect(rows[1]).toHaveTextContent('Inactive')
+    expect(rows[2]).toHaveTextContent('Ford station')
+    expect(rows[2]).toHaveTextContent('Deregistered')
+    await waitFor(() =>
+      expect(carOptions('Filter by car')).toEqual([
+        'All cars',
+        'VW Golf',
+        'Renault Zoe',
+      ]),
+    )
+  })
+
+  it('keeps a deregistered car selected through the URL', async () => {
+    backend(entries, cars)
+    renderApp(`/refuels?carId=${sold.id}`)
+
+    await screen.findByRole('table', { name: 'Your refuels' })
+    await waitFor(() =>
+      expect(screen.getByLabelText('Filter by car')).toHaveValue(sold.id),
+    )
+  })
+
+  it('offers only cars that are not deregistered on creation', async () => {
+    backend(entries, cars)
+    renderApp('/refuels/create')
+
+    await screen.findByLabelText('Car')
+    expect(carOptions('Car')).not.toContain('Ford Ka')
+    expect(carOptions('Car')).toContain('VW Golf')
+    expect(carOptions('Car')).toContain('Renault Zoe')
+  })
+
+  it('does not preselect a deregistered car named in carId', async () => {
+    backend(entries, cars)
+    renderApp(`/refuels/create?carId=${sold.id}`)
+
+    expect(await screen.findByLabelText('Car')).toHaveValue('')
   })
 })

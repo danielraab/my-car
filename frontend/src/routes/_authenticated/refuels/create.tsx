@@ -4,6 +4,7 @@ import { Fuel } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { createRefuel } from '#/api/client'
+import { isDeregistered } from '#/cars/deregistration'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { refuelStationsQueryOptions, refuelsQueryKey } from '#/refuels/queries'
 import { RefuelForm } from '#/refuels/refuel-form'
@@ -29,7 +30,9 @@ function CreateRefuelPage() {
       void navigate({ to: '/refuels' })
     },
   })
-  const carList = cars.data?.items ?? []
+  // Deregistered cars are not offered, so a carId naming one preselects
+  // nothing.
+  const carList = (cars.data?.items ?? []).filter((car) => !isDeregistered(car))
   const initialCarId =
     carList.find((car) => car.id === carId)?.id ??
     (carList.length === 1 ? carList[0].id : '')

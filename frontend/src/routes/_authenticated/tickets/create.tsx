@@ -4,6 +4,7 @@ import { ReceiptText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { createTicket } from '#/api/client'
+import { isDeregistered } from '#/cars/deregistration'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { CarsStatus } from '#/repairs/cars-status'
 import { ticketLocationsQueryOptions, ticketsQueryKey } from '#/tickets/queries'
@@ -29,7 +30,9 @@ function CreateTicketPage() {
       void navigate({ to: '/tickets' })
     },
   })
-  const carList = cars.data?.items ?? []
+  // Deregistered cars are not offered, so a carId naming one preselects
+  // nothing.
+  const carList = (cars.data?.items ?? []).filter((car) => !isDeregistered(car))
   const initialCarId =
     carList.find((car) => car.id === carId)?.id ??
     (carList.length === 1 ? carList[0].id : '')

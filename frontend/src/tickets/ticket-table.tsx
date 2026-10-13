@@ -1,25 +1,26 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import type { Ticket } from '#/api/client'
-import { formatAmount } from '#/cars/format'
+import type { Car, Ticket } from '#/api/client'
+import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
+import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
 
 // The tickets table shared by /tickets and a car's Expenses tab. Leaving out
-// carNames hides the car column; a total adds a footer row summing the
+// cars hides the car column; a total adds a footer row summing the
 // amounts.
 export function TicketTable({
   items,
-  carNames,
+  cars,
   total,
 }: {
   items: Ticket[]
-  carNames?: Map<string, string>
+  cars?: Map<string, Car>
   total?: number
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
-  const showCar = carNames !== undefined
+  const showCar = cars !== undefined
 
   return (
     <div className="table-wrap">
@@ -38,7 +39,10 @@ export function TicketTable({
         </thead>
         <tbody>
           {items.map((ticket) => (
-            <tr key={ticket.id}>
+            <tr
+              key={ticket.id}
+              className={carRowClass(cars?.get(ticket.carId))}
+            >
               <td>
                 <Link
                   className="table-link"
@@ -51,8 +55,10 @@ export function TicketTable({
               {showCar ? (
                 <td>
                   <Link to="/cars/$carId" params={{ carId: ticket.carId }}>
-                    {carNames.get(ticket.carId) ?? t('tickets.unknownCar')}
+                    {carLabel(cars.get(ticket.carId)) ??
+                      t('tickets.unknownCar')}
                   </Link>
+                  <CarStateBadge car={cars.get(ticket.carId)} />
                 </td>
               ) : null}
               <td>{t(`tickets.types.${ticket.type}`)}</td>

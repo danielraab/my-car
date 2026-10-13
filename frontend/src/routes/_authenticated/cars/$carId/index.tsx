@@ -163,6 +163,16 @@ function CarDetails({ car }: { car: Car }) {
         ? notRecorded
         : formatAmount(car.purchasePrice, locale),
     ],
+    [
+      'isActive',
+      t(car.isActive ? 'cars.states.active' : 'cars.states.inactive'),
+    ],
+    [
+      'deregistrationDate',
+      car.deregistrationDate === null
+        ? notRecorded
+        : formatDate(car.deregistrationDate, locale),
+    ],
   ]
 
   return (
@@ -174,6 +184,10 @@ function CarDetails({ car }: { car: Car }) {
             <dd>{value}</dd>
           </div>
         ))}
+        <div className="detail-wide">
+          <dt>{t('cars.fields.information')}</dt>
+          <dd className="preserve-lines">{car.information ?? notRecorded}</dd>
+        </div>
       </dl>
 
       <div className="form-actions">

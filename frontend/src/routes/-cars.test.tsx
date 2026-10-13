@@ -25,6 +25,8 @@ const golf: Car = {
   isActive: true,
   purchaseDate: '2019-04-15',
   purchasePrice: '18500.50',
+  deregistrationDate: null,
+  information: null,
   createdAt: '2026-09-27T10:00:00Z',
   updatedAt: '2026-09-27T10:00:00Z',
 }
@@ -126,6 +128,33 @@ describe('cars list', () => {
     expect(
       screen.queryByRole('button', { name: 'Load more cars' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('mutes and badges inactive and deregistered cars in place', async () => {
+    const inactive = { ...zoe, isActive: false }
+    const deregistered = { ...ka, deregistrationDate: '2020-01-01' }
+    const future = { ...golf, deregistrationDate: '2999-12-31' }
+    backend({
+      'GET /api/v1/cars': () =>
+        response(200, {
+          items: [future, inactive, deregistered],
+          nextCursor: null,
+        }),
+    })
+    renderApp('/cars')
+
+    const table = await screen.findByRole('table', { name: 'Your cars' })
+    const [, futureRow, inactiveRow, deregisteredRow] =
+      within(table).getAllByRole('row')
+    expect(futureRow).not.toHaveClass('row-muted')
+    expect(futureRow).not.toHaveTextContent(/Inactive|Deregistered/)
+    expect(inactiveRow).toHaveClass('row-muted')
+    expect(inactiveRow).toHaveTextContent('Inactive')
+    expect(deregisteredRow).toHaveClass('row-muted')
+    expect(deregisteredRow).toHaveTextContent('Deregistered')
+    expect(
+      within(deregisteredRow).getByRole('link', { name: 'Ka' }),
+    ).toBeInTheDocument()
   })
 
   it('shows a placeholder for absent registration details', async () => {
@@ -252,6 +281,7 @@ describe('car creation', () => {
       screen.getByRole('textbox', { name: /Purchase price/ }),
       '18500,50',
     )
+    expect(screen.getByRole('switch', { name: 'Active' })).toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Add car' }))
 
     expect(
@@ -268,8 +298,84 @@ describe('car creation', () => {
       fin: null,
       purchaseDate: null,
       purchasePrice: '18500.50',
+      isActive: true,
+      deregistrationDate: null,
+      information: null,
     })
-    expect(screen.queryByLabelText(/Active/)).not.toBeInTheDocument()
+  })
+
+  it('creates an inactive car with multi-line information', async () => {
+    const saved = { ...golf, isActive: false, information: 'Line 1\nLine 2' }
+    const calls = backend({
+      'POST /api/v1/cars': () => response(201, saved),
+      [`GET ${carPath}`]: () => response(200, saved),
+    })
+    const user = userEvent.setup()
+    renderApp('/cars/create')
+
+    await fillRequired(user)
+    const active = screen.getByRole('switch', { name: 'Active' })
+    await user.click(active)
+    expect(active).not.toBeChecked()
+    await user.type(
+      screen.getByRole('textbox', { name: /Information/ }),
+      'Line 1{Enter}Line 2',
+    )
+    await user.click(screen.getByRole('button', { name: 'Add car' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Golf' }),
+    ).toBeInTheDocument()
+    expect(bodyOf(calls, 'POST /api/v1/cars')).toMatchObject({
+      isActive: false,
+      information: 'Line 1\nLine 2',
+      deregistrationDate: null,
+    })
+  })
+
+  it('rejects a deregistration date before the first registration', async () => {
+    const calls = backend({})
+    const user = userEvent.setup()
+    const { router } = renderApp('/cars/create')
+
+    await fillRequired(user)
+    const deregistration = screen.getByLabelText(/Deregistration date/)
+    fireEvent.change(deregistration, { target: { value: '2019-02-28' } })
+    await user.click(screen.getByRole('button', { name: 'Add car' }))
+
+    expect(
+      await screen.findByText(
+        'The deregistration date cannot be before the first registration.',
+      ),
+    ).toHaveAttribute('id', 'car-deregistrationDate-error')
+    expect(deregistration).toHaveAttribute('aria-invalid', 'true')
+    expect(calls.some((call) => call.key === 'POST /api/v1/cars')).toBe(false)
+    expect(router.state.location.pathname).toBe('/cars/create')
+
+    fireEvent.change(deregistration, { target: { value: '2019-03-01' } })
+    expect(deregistration).toHaveAttribute('aria-invalid', 'false')
+  })
+
+  it('shows a backend date-order rejection at the deregistration date', async () => {
+    backend({
+      'POST /api/v1/cars': () =>
+        response(400, {
+          code: 'validation_failed',
+          message: 'request validation failed',
+          fields: { deregistrationDate: 'before_first_registration' },
+        }),
+    })
+    const user = userEvent.setup()
+    renderApp('/cars/create')
+
+    await fillRequired(user)
+    await user.click(screen.getByRole('button', { name: 'Add car' }))
+
+    expect(
+      await screen.findByText(
+        'The deregistration date cannot be before the first registration.',
+      ),
+    ).toHaveAttribute('id', 'car-deregistrationDate-error')
   })
 
   it('sends absent registration details as null', async () => {
@@ -351,6 +457,9 @@ describe('car detail', () => {
       ['Vehicle identification number (FIN)', 'Not recorded'],
       ['Purchase date', 'Apr 15, 2019'],
       ['Purchase price', '18,500.50'],
+      ['Active', 'Active'],
+      ['Deregistration date', 'Not recorded'],
+      ['Information', 'Not recorded'],
     ])
     expect(screen.getByRole('link', { name: 'Edit car' })).toHaveAttribute(
       'href',
@@ -369,6 +478,27 @@ describe('car detail', () => {
       within(details).getByText(field).nextElementSibling?.textContent
     expect(value('First registration')).toBe('Not recorded')
     expect(value('License plate')).toBe('Not recorded')
+  })
+
+  it('shows a deregistered car with its information line by line', async () => {
+    const sold = {
+      ...golf,
+      isActive: false,
+      deregistrationDate: '2024-06-30',
+      information: 'Sold to Anna\nPaid in cash',
+    }
+    backend({ [`GET ${carPath}`]: () => response(200, sold) })
+    renderApp(`/cars/${golf.id}`)
+
+    await screen.findByRole('heading', { name: 'Golf' })
+    const details = screen.getByText('Hatchback').closest('dl') as HTMLElement
+    const value = (field: string) =>
+      within(details).getByText(field).nextElementSibling
+    expect(value('Active')).toHaveTextContent('Inactive')
+    expect(value('Deregistration date')).toHaveTextContent('Jun 30, 2024')
+    const information = value('Information')
+    expect(information?.textContent).toBe('Sold to Anna\nPaid in cash')
+    expect(information).toHaveClass('preserve-lines')
   })
 
   it('shows a not-found state for a missing or unowned car', async () => {
@@ -447,6 +577,66 @@ describe('car editing', () => {
     expect(bodyOf(calls, `PATCH ${carPath}`)).toMatchObject({
       licensePlate: null,
       firstRegistration: '2019-03-01',
+    })
+  })
+
+  it('switches a car to inactive', async () => {
+    const saved = { ...golf, isActive: false }
+    const calls = backend({
+      [`GET ${carPath}`]: [
+        () => response(200, golf),
+        () => response(200, saved),
+      ],
+      [`PATCH ${carPath}`]: () => response(200, saved),
+    })
+    const user = userEvent.setup()
+    renderApp(`/cars/${golf.id}/edit`)
+
+    const active = await screen.findByRole('switch', { name: 'Active' })
+    expect(active).toBeChecked()
+    await user.click(active)
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Golf' }),
+    ).toBeInTheDocument()
+    expect(bodyOf(calls, `PATCH ${carPath}`)).toMatchObject({
+      isActive: false,
+      deregistrationDate: null,
+    })
+  })
+
+  it('clears the deregistration date and information', async () => {
+    const sold = {
+      ...golf,
+      deregistrationDate: '2024-06-30',
+      information: 'Sold',
+    }
+    const saved = { ...golf }
+    const calls = backend({
+      [`GET ${carPath}`]: [
+        () => response(200, sold),
+        () => response(200, saved),
+      ],
+      [`PATCH ${carPath}`]: () => response(200, saved),
+    })
+    const user = userEvent.setup()
+    renderApp(`/cars/${golf.id}/edit`)
+
+    const deregistration = await screen.findByLabelText(/Deregistration date/)
+    expect(deregistration).toHaveValue('2024-06-30')
+    const information = screen.getByRole('textbox', { name: /Information/ })
+    expect(information).toHaveValue('Sold')
+    fireEvent.change(deregistration, { target: { value: '' } })
+    await user.clear(information)
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Golf' }),
+    ).toBeInTheDocument()
+    expect(bodyOf(calls, `PATCH ${carPath}`)).toMatchObject({
+      deregistrationDate: null,
+      information: null,
     })
   })
 

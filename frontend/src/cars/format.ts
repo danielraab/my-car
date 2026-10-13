@@ -17,3 +17,10 @@ export function formatAmount(value: string, locale: string): string {
     maximumFractionDigits: 2,
   }).format(amount)
 }
+
+// How a car is named where it is referenced, such as a table's car column.
+export function carLabel(
+  car: { make: string; name: string } | undefined,
+): string | undefined {
+  return car === undefined ? undefined : `${car.make} ${car.name}`
+}

@@ -1,11 +1,29 @@
 import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import type { Repair } from '#/api/client'
+import type { Car, Repair } from '#/api/client'
 import '#/i18n'
 import { renderInRouter } from '#/test/render-in-router'
 
 import { RepairTable } from './repair-table'
+
+const golf: Car = {
+  id: '22222222-2222-2222-2222-222222222222',
+  type: 'Hatchback',
+  make: 'VW',
+  name: 'Golf',
+  fuel: 'diesel',
+  firstRegistration: '2019-03-01',
+  licensePlate: 'W-123AB',
+  fin: null,
+  isActive: true,
+  purchaseDate: null,
+  purchasePrice: null,
+  deregistrationDate: null,
+  information: null,
+  createdAt: '2026-09-27T10:00:00Z',
+  updatedAt: '2026-09-27T10:00:00Z',
+}
 
 const item: Repair = {
   id: '4d7c2b1e-8a3f-4c6d-9e0f-1a2b3c4d5e6f',
@@ -23,7 +41,7 @@ describe('RepairTable', () => {
     await renderInRouter(
       <RepairTable
         items={[item]}
-        carNames={new Map([[item.carId, 'VW Golf']])}
+        cars={new Map([[item.carId, golf]])}
         total={Number(item.amount)}
       />,
     )
@@ -47,5 +65,30 @@ describe('RepairTable', () => {
     expect(
       screen.queryByText('Total of the repairs shown'),
     ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [{ isActive: false }, 'Inactive'],
+    [{ deregistrationDate: '2020-01-01' }, 'Deregistered'],
+  ])('mutes and badges the row of a car with %o', async (change, badge) => {
+    await renderInRouter(
+      <RepairTable
+        items={[item]}
+        cars={new Map([[item.carId, { ...golf, ...change }]])}
+      />,
+    )
+    const row = (await screen.findAllByRole('row'))[1]
+    expect(row).toHaveClass('row-muted')
+    expect(row).toHaveTextContent(badge)
+    expect(screen.getByRole('link', { name: 'VW Golf' })).toBeInTheDocument()
+  })
+
+  it('does not mute the row of an active car', async () => {
+    await renderInRouter(
+      <RepairTable items={[item]} cars={new Map([[item.carId, golf]])} />,
+    )
+    const row = (await screen.findAllByRole('row'))[1]
+    expect(row).not.toHaveClass('row-muted')
+    expect(row).not.toHaveTextContent(/Inactive|Deregistered/)
   })
 })

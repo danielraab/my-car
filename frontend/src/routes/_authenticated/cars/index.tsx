@@ -3,6 +3,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { CarFront, LoaderCircle, Plus, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CarStateBadge } from '#/cars/car-state-badge'
+import { isCarMuted } from '#/cars/deregistration'
 import { formatAmount, formatDate } from '#/cars/format'
 import { carsListQueryOptions } from '#/cars/queries'
 
@@ -76,7 +78,10 @@ function CarsPage() {
               </thead>
               <tbody>
                 {items.map((car) => (
-                  <tr key={car.id}>
+                  <tr
+                    key={car.id}
+                    className={isCarMuted(car) ? 'row-muted' : undefined}
+                  >
                     <td>{car.type}</td>
                     <td>{car.make}</td>
                     <td>
@@ -87,6 +92,7 @@ function CarsPage() {
                       >
                         {car.name}
                       </Link>
+                      <CarStateBadge car={car} />
                     </td>
                     <td>{t(`cars.fuels.${car.fuel}`)}</td>
                     <td>

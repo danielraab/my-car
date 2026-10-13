@@ -1133,6 +1133,10 @@ select:focus-visible {
   font-weight: 750;
 }
 
+.detail-list .detail-wide {
+  grid-column: 1 / -1;
+}
+
 .detail-list dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -1183,6 +1187,76 @@ select:focus-visible {
 .data-table .numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Rows of an inactive or deregistered car; the badge carries the state in
+   text, so colour is not the only signal. */
+.data-table tr.row-muted td {
+  color: var(--muted);
+}
+
+.data-table tr.row-muted .table-link {
+  text-decoration-color: var(--line);
+}
+
+.car-state-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 750;
+  vertical-align: middle;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3rem;
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0.15rem;
+  background: var(--line);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.switch[data-checked] {
+  background: var(--accent-dark);
+}
+
+.switch[data-focus] {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.switch-thumb {
+  width: 1.2rem;
+  height: 1.2rem;
+  background: white;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  transition: transform 150ms;
+}
+
+.switch[data-checked] .switch-thumb {
+  transform: translateX(1.25rem);
+}
+
+.preserve-lines {
+  white-space: pre-line;
 }
 
 .table-link {

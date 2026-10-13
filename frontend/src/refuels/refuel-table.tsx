@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import type { Refuel } from '#/api/client'
-import { formatAmount } from '#/cars/format'
+import type { Car, Refuel } from '#/api/client'
+import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
+import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
 
 function formatNumber(value: string, locale: string, fractionDigits: number) {
@@ -14,23 +15,23 @@ function formatNumber(value: string, locale: string, fractionDigits: number) {
 }
 
 // The refuels table shared by /refuels and a car's Expenses tab. Leaving out
-// carNames hides the car column. Consumption comes from derived, the chart
+// cars hides the car column. Consumption comes from derived, the chart
 // series, because a table page may not hold each row's predecessor. A total
 // adds a footer row summing the amounts.
 export function RefuelTable({
   items,
   derived,
-  carNames,
+  cars,
   total,
 }: {
   items: Refuel[]
   derived: Map<string, Refuel>
-  carNames?: Map<string, string>
+  cars?: Map<string, Car>
   total?: number
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
-  const showCar = carNames !== undefined
+  const showCar = cars !== undefined
 
   return (
     <div className="table-wrap">
@@ -63,7 +64,10 @@ export function RefuelTable({
           {items.map((refuel) => {
             const consumption = derived.get(refuel.id)?.consumption
             return (
-              <tr key={refuel.id}>
+              <tr
+                key={refuel.id}
+                className={carRowClass(cars?.get(refuel.carId))}
+              >
                 <td>
                   <Link
                     className="table-link"
@@ -76,8 +80,10 @@ export function RefuelTable({
                 {showCar ? (
                   <td>
                     <Link to="/cars/$carId" params={{ carId: refuel.carId }}>
-                      {carNames.get(refuel.carId) ?? t('refuels.unknownCar')}
+                      {carLabel(cars.get(refuel.carId)) ??
+                        t('refuels.unknownCar')}
                     </Link>
+                    <CarStateBadge car={cars.get(refuel.carId)} />
                   </td>
                 ) : null}
                 <td className="wrap">{refuel.station}</td>

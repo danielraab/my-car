@@ -85,6 +85,41 @@ pnpm install
 pnpm dev
 ```
 
+**Backend tests**
+
+Without a database, tests that need Postgres are skipped:
+
+```bash
+cd backend
+go test ./...
+```
+
+To run them as well, set `DATABASE_URL`. The tests run migrations and
+truncate tables, so use a throwaway database rather than your development
+one:
+
+```bash
+docker run -d --rm --name mycars-test -p 55432:5432 \
+  -e POSTGRES_USER=mycars -e POSTGRES_PASSWORD=mycars -e POSTGRES_DB=mycars \
+  postgres:17
+cd backend
+DATABASE_URL='postgres://mycars:mycars@localhost:55432/mycars?sslmode=disable' \
+  go test ./...
+docker stop mycars-test
+```
+
+**Frontend tests and checks**
+
+```bash
+cd frontend
+pnpm test        # Vitest, once (pnpm test:watch to keep it running)
+pnpm typecheck   # TypeScript
+pnpm check       # Biome lint and formatting (pnpm format --write to fix formatting)
+pnpm check:api   # generated API types match openapi/openapi.yaml
+```
+
+If `check:api` fails, regenerate the types with `pnpm generate:api`.
+
 ## Development workflow
 
 This project follows **spec-driven development with [OpenSpec](openspec/)**.

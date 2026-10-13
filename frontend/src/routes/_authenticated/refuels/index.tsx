@@ -44,9 +44,7 @@ function RefuelsPage() {
   const cars = useQuery(allCarsQueryOptions)
   const items = refuels.data?.pages.flatMap((page) => page.items) ?? []
   const total = items.reduce((sum, refuel) => sum + Number(refuel.amount), 0)
-  const carNames = new Map(
-    cars.data?.items.map((car) => [car.id, `${car.make} ${car.name}`]),
-  )
+  const carsById = new Map(cars.data?.items.map((car) => [car.id, car]))
   // Consumption needs each refuel's predecessor, which only the complete
   // chart series is guaranteed to hold.
   const derived = new Map(
@@ -138,7 +136,7 @@ function RefuelsPage() {
           <RefuelTable
             items={items}
             derived={derived}
-            carNames={carNames}
+            cars={carsById}
             total={total}
           />
 

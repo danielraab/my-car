@@ -55,6 +55,7 @@ func (f *fakeRepository) Create(_ context.Context, accountID string, in Input) (
 	c := sampleCar()
 	c.Name, c.Fuel, c.FIN, c.IsActive = in.Name, in.Fuel, in.FIN, in.IsActive
 	c.FirstRegistration, c.LicensePlate = in.FirstRegistration, in.LicensePlate
+	c.DeregistrationDate, c.Information = in.DeregistrationDate, in.Information
 	return c, nil
 }
 
@@ -74,10 +75,14 @@ func (f *fakeRepository) Update(_ context.Context, accountID, _ string, p Patch)
 		return Car{}, f.err
 	}
 	c := sampleCar()
+	if p.IsActive != nil {
+		c.IsActive = *p.IsActive
+	}
 	for _, field := range []struct {
 		patch  Nullable
 		column **string
-	}{{p.FirstRegistration, &c.FirstRegistration}, {p.LicensePlate, &c.LicensePlate}, {p.FIN, &c.FIN}} {
+	}{{p.FirstRegistration, &c.FirstRegistration}, {p.LicensePlate, &c.LicensePlate}, {p.FIN, &c.FIN},
+		{p.DeregistrationDate, &c.DeregistrationDate}, {p.Information, &c.Information}} {
 		if field.patch.Set {
 			*field.column = field.patch.Value
 		}
@@ -127,7 +132,7 @@ func TestCreateCar(t *testing.T) {
 		t.Fatalf("store input = %+v for %s", repo.input, repo.account)
 	}
 	body := decodeMap(t, rec)
-	for _, key := range []string{"id", "type", "make", "name", "fuel", "firstRegistration", "licensePlate", "fin", "isActive", "purchaseDate", "purchasePrice", "createdAt", "updatedAt"} {
+	for _, key := range []string{"id", "type", "make", "name", "fuel", "firstRegistration", "licensePlate", "fin", "isActive", "purchaseDate", "purchasePrice", "deregistrationDate", "information", "createdAt", "updatedAt"} {
 		if _, ok := body[key]; !ok {
 			t.Fatalf("car member %q missing: %v", key, body)
 		}
@@ -190,6 +195,11 @@ func TestCarValidation(t *testing.T) {
 		{"invalid dates", http.MethodPatch, `{"firstRegistration":"2019-02-30","purchaseDate":"15.04.2019"}`, map[string]string{"firstRegistration": apierror.ReasonInvalidDate, "purchaseDate": apierror.ReasonInvalidDate}},
 		{"invalid decimal", http.MethodPatch, `{"purchasePrice":"12,50"}`, map[string]string{"purchasePrice": apierror.ReasonInvalidDecimal}},
 		{"negative price", http.MethodPatch, `{"purchasePrice":"-0.01"}`, map[string]string{"purchasePrice": apierror.ReasonNegative}},
+		{"blank information on create", http.MethodPost, strings.Replace(validCreate, `{`, `{"information":" \n\t ",`, 1), map[string]string{"information": apierror.ReasonEmpty}},
+		{"blank information on update", http.MethodPatch, `{"information":""}`, map[string]string{"information": apierror.ReasonEmpty}},
+		{"oversized information", http.MethodPatch, `{"information":"` + strings.Repeat("ä", maxInformationLength+1) + `"}`, map[string]string{"information": apierror.ReasonTooLong}},
+		{"invalid deregistration date", http.MethodPatch, `{"deregistrationDate":"2024-13-01"}`, map[string]string{"deregistrationDate": apierror.ReasonInvalidDate}},
+		{"deregistration before first registration on create", http.MethodPost, strings.Replace(validCreate, `{`, `{"deregistrationDate":"2019-02-28",`, 1), map[string]string{"deregistrationDate": apierror.ReasonBeforeFirstRegistration}},
 		{"empty update", http.MethodPatch, `{}`, map[string]string{apierror.BodyField: apierror.ReasonRequired}},
 	}
 	for _, tc := range cases {
@@ -243,6 +253,105 @@ func TestUpdateClearsOptionalField(t *testing.T) {
 	}
 	if body := decodeMap(t, rec); body["fin"] != nil || body["firstRegistration"] != nil || body["licensePlate"] != nil {
 		t.Fatalf("body = %v", body)
+	}
+}
+
+func TestCreateCarWithDeregistrationAndInformation(t *testing.T) {
+	repo := &fakeRepository{}
+	body := strings.Replace(validCreate, `{`, `{"isActive":false,"deregistrationDate":"2019-03-01","information":"  Sold\nto Anna  ",`, 1)
+	rec := serve(t, repo, passSession, http.MethodPost, "/api/v1/cars", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	got := decodeMap(t, rec)
+	if got["isActive"] != false || got["deregistrationDate"] != "2019-03-01" || got["information"] != "Sold\nto Anna" {
+		t.Fatalf("body = %v", got)
+	}
+}
+
+func TestUpdateCarInformationAtMaximumLength(t *testing.T) {
+	repo := &fakeRepository{}
+	text := strings.Repeat("ä", maxInformationLength)
+	rec := serve(t, repo, passSession, http.MethodPatch, "/api/v1/cars/"+carID, `{"information":"`+text+`"}`)
+	if rec.Code != http.StatusOK || repo.patch.Information.Value == nil || *repo.patch.Information.Value != text {
+		t.Fatalf("status = %d, patch = %+v", rec.Code, repo.patch)
+	}
+}
+
+func TestUpdateActiveStateLeavesDeregistration(t *testing.T) {
+	repo := &fakeRepository{}
+	rec := serve(t, repo, passSession, http.MethodPatch, "/api/v1/cars/"+carID, `{"isActive":false}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if repo.calls != 1 || repo.patch.DeregistrationDate.Set || repo.patch.IsActive == nil || *repo.patch.IsActive {
+		t.Fatalf("calls = %d, patch = %+v", repo.calls, repo.patch)
+	}
+	if got := decodeMap(t, rec); got["isActive"] != false || got["deregistrationDate"] != nil {
+		t.Fatalf("body = %v", got)
+	}
+}
+
+func TestUpdateClearsDeregistrationAndInformation(t *testing.T) {
+	repo := &fakeRepository{}
+	rec := serve(t, repo, passSession, http.MethodPatch, "/api/v1/cars/"+carID, `{"deregistrationDate":null,"information":null}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	p := repo.patch
+	if !p.DeregistrationDate.Set || p.DeregistrationDate.Value != nil || !p.Information.Set || p.Information.Value != nil {
+		t.Fatalf("patch = %+v", p)
+	}
+}
+
+func TestUpdateChecksDateOrderAgainstStoredCar(t *testing.T) {
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		// sampleCar's stored first registration is 2019-03-01.
+		{"deregistration before stored first registration", `{"deregistrationDate":"2019-02-28"}`, http.StatusBadRequest},
+		{"deregistration on stored first registration", `{"deregistrationDate":"2019-03-01"}`, http.StatusOK},
+		{"both dates out of order", `{"firstRegistration":"2020-01-01","deregistrationDate":"2019-12-31"}`, http.StatusBadRequest},
+		{"first registration cleared", `{"firstRegistration":null,"deregistrationDate":"2000-01-01"}`, http.StatusOK},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &fakeRepository{}
+			rec := serve(t, repo, passSession, http.MethodPatch, "/api/v1/cars/"+carID, tc.body)
+			if rec.Code != tc.want {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+			}
+			if tc.want != http.StatusBadRequest {
+				return
+			}
+			if repo.patch != (Patch{}) {
+				t.Fatalf("store updated on a rejected request: %+v", repo.patch)
+			}
+			fields, _ := decodeMap(t, rec)["fields"].(map[string]any)
+			if fields["deregistrationDate"] != apierror.ReasonBeforeFirstRegistration {
+				t.Fatalf("fields = %v", fields)
+			}
+		})
+	}
+}
+
+func TestUpdateDateOrderForMissingCarIsNotFound(t *testing.T) {
+	repo := &fakeRepository{err: ErrNotFound}
+	rec := serve(t, repo, passSession, http.MethodPatch, "/api/v1/cars/"+carID, `{"deregistrationDate":"2020-01-01"}`)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+}
+
+func TestDatabaseDateOrderRejectionIsValidationError(t *testing.T) {
+	repo := &fakeRepository{err: ErrDeregistrationBeforeFirstRegistration}
+	rec := serve(t, repo, passSession, http.MethodPost, "/api/v1/cars", validCreate)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if fields, _ := decodeMap(t, rec)["fields"].(map[string]any); fields["deregistrationDate"] != apierror.ReasonBeforeFirstRegistration {
+		t.Fatalf("fields = %v", fields)
 	}
 }
 
