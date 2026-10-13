@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
@@ -21,6 +22,8 @@ const (
 	defaultLimit = 25
 	maxLimit     = 100
 	maxBodyBytes = 16 << 10
+	// maxInformationLength is information's maxLength in characters.
+	maxInformationLength = 2000
 )
 
 var (
@@ -77,19 +80,21 @@ func (h *Handler) withCar(next func(http.ResponseWriter, *http.Request, string, 
 }
 
 type carBody struct {
-	ID                string  `json:"id"`
-	Type              string  `json:"type"`
-	Make              string  `json:"make"`
-	Name              string  `json:"name"`
-	Fuel              string  `json:"fuel"`
-	FirstRegistration *string `json:"firstRegistration"`
-	LicensePlate      *string `json:"licensePlate"`
-	FIN               *string `json:"fin"`
-	IsActive          bool    `json:"isActive"`
-	PurchaseDate      *string `json:"purchaseDate"`
-	PurchasePrice     *string `json:"purchasePrice"`
-	CreatedAt         string  `json:"createdAt"`
-	UpdatedAt         string  `json:"updatedAt"`
+	ID                 string  `json:"id"`
+	Type               string  `json:"type"`
+	Make               string  `json:"make"`
+	Name               string  `json:"name"`
+	Fuel               string  `json:"fuel"`
+	FirstRegistration  *string `json:"firstRegistration"`
+	LicensePlate       *string `json:"licensePlate"`
+	FIN                *string `json:"fin"`
+	IsActive           bool    `json:"isActive"`
+	PurchaseDate       *string `json:"purchaseDate"`
+	PurchasePrice      *string `json:"purchasePrice"`
+	DeregistrationDate *string `json:"deregistrationDate"`
+	Information        *string `json:"information"`
+	CreatedAt          string  `json:"createdAt"`
+	UpdatedAt          string  `json:"updatedAt"`
 }
 
 func toBody(c Car) carBody {
@@ -97,6 +102,7 @@ func toBody(c Car) carBody {
 		ID: c.ID, Type: c.Type, Make: c.Make, Name: c.Name, Fuel: c.Fuel,
 		FirstRegistration: c.FirstRegistration, LicensePlate: c.LicensePlate, FIN: c.FIN,
 		IsActive: c.IsActive, PurchaseDate: c.PurchaseDate, PurchasePrice: c.PurchasePrice,
+		DeregistrationDate: c.DeregistrationDate, Information: c.Information,
 		CreatedAt: c.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: c.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
@@ -110,6 +116,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func (h *Handler) fail(w http.ResponseWriter, op string, err error) {
 	if errors.Is(err, ErrNotFound) {
 		apierror.NotFound(w)
+		return
+	}
+	if errors.Is(err, ErrDeregistrationBeforeFirstRegistration) {
+		apierror.Validation(w, map[string]string{"deregistrationDate": apierror.ReasonBeforeFirstRegistration})
 		return
 	}
 	log.Printf("%s car: %v", op, err)
@@ -172,6 +182,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 			}
 		}
 	}
+	if len(fields) == 0 && deregisteredBeforeFirstRegistration(p.FirstRegistration.Value, p.DeregistrationDate.Value) {
+		fields["deregistrationDate"] = apierror.ReasonBeforeFirstRegistration
+	}
 	if len(fields) > 0 {
 		apierror.Validation(w, fields)
 		return
@@ -180,6 +193,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 		Type: *p.Type, Make: *p.Make, Name: *p.Name, Fuel: *p.Fuel,
 		FirstRegistration: p.FirstRegistration.Value, LicensePlate: p.LicensePlate.Value,
 		FIN: p.FIN.Value, PurchaseDate: p.PurchaseDate.Value, PurchasePrice: p.PurchasePrice.Value,
+		DeregistrationDate: p.DeregistrationDate.Value, Information: p.Information.Value,
 		IsActive: p.IsActive == nil || *p.IsActive,
 	}
 	c, err := h.store.Create(r.Context(), accountID, in)
@@ -211,12 +225,47 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, accountID, carI
 		apierror.Validation(w, fields)
 		return
 	}
+	if p.FirstRegistration.Set || p.DeregistrationDate.Set {
+		ok, err := h.datesInOrder(r.Context(), accountID, carID, p)
+		if err != nil {
+			h.fail(w, "update", err)
+			return
+		}
+		if !ok {
+			apierror.Validation(w, map[string]string{"deregistrationDate": apierror.ReasonBeforeFirstRegistration})
+			return
+		}
+	}
 	c, err := h.store.Update(r.Context(), accountID, carID, p)
 	if err != nil {
 		h.fail(w, "update", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toBody(c))
+}
+
+// datesInOrder checks the patched car's deregistration date against its
+// first registration, taking a date the patch does not supply from the
+// stored car. The database check still guards against a concurrent change.
+func (h *Handler) datesInOrder(ctx context.Context, accountID, carID string, p Patch) (bool, error) {
+	stored, err := h.store.Get(ctx, accountID, carID)
+	if err != nil {
+		return false, err
+	}
+	first, deregistration := stored.FirstRegistration, stored.DeregistrationDate
+	if p.FirstRegistration.Set {
+		first = p.FirstRegistration.Value
+	}
+	if p.DeregistrationDate.Set {
+		deregistration = p.DeregistrationDate.Value
+	}
+	return !deregisteredBeforeFirstRegistration(first, deregistration), nil
+}
+
+// deregisteredBeforeFirstRegistration compares two validated full-dates,
+// whose fixed-width form orders lexically.
+func deregisteredBeforeFirstRegistration(first, deregistration *string) bool {
+	return first != nil && deregistration != nil && *deregistration < *first
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request, accountID, carID string) {
@@ -269,6 +318,10 @@ func decodeBody(w http.ResponseWriter, r *http.Request) (Patch, map[string]strin
 			p.FIN = nullableString(key, value, fields, checkNonBlank)
 		case "purchaseDate":
 			p.PurchaseDate = nullableString(key, value, fields, checkDate)
+		case "deregistrationDate":
+			p.DeregistrationDate = nullableString(key, value, fields, checkDate)
+		case "information":
+			p.Information = nullableString(key, value, fields, checkInformation)
 		case "purchasePrice":
 			p.PurchasePrice = nullableString(key, value, fields, func(s string) (string, string) {
 				if !decimalPattern.MatchString(s) {
@@ -326,6 +379,15 @@ func checkNonBlank(s string) (string, string) {
 		return "", apierror.ReasonEmpty
 	}
 	return s, ""
+}
+
+// checkInformation trims the free-form text, rejecting a blank or overlong one.
+func checkInformation(s string) (string, string) {
+	s, reason := checkNonBlank(s)
+	if reason == "" && utf8.RuneCountInString(s) > maxInformationLength {
+		return "", apierror.ReasonTooLong
+	}
+	return s, reason
 }
 
 func checkDate(s string) (string, string) {

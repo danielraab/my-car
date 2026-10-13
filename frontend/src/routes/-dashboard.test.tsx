@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Car, ExpenseRow } from '#/api/client'
 import { i18n } from '#/i18n'
-import { yearToInstants } from '#/lib/date-range'
+import { toCalendarDate, yearToInstants } from '#/lib/date-range'
 import { renderApp } from '#/test/render-app'
 
 const profile = {
@@ -26,6 +26,8 @@ const golf: Car = {
   isActive: true,
   purchaseDate: null,
   purchasePrice: null,
+  deregistrationDate: null,
+  information: null,
   createdAt: '2026-09-27T10:00:00Z',
   updatedAt: '2026-09-27T10:00:00Z',
 }
@@ -37,6 +39,18 @@ const honda: Car = {
   make: 'Honda',
   name: 'CB500',
 }
+
+// Deregistered since yesterday; still registered until far in the future.
+const yesterday = new Date()
+yesterday.setDate(yesterday.getDate() - 1)
+const sold: Car = {
+  ...golf,
+  id: 'c7d2e0a4-1b3f-4e5a-8c6d-7e8f9a0b1c2d',
+  make: 'Ford',
+  name: 'Ka',
+  deregistrationDate: toCalendarDate(yesterday),
+}
+const leaving: Car = { ...honda, deregistrationDate: '2999-12-31' }
 
 const currentYear = new Date().getFullYear()
 
@@ -62,7 +76,7 @@ type Handler = (query: URLSearchParams) => Response
 
 // Routes fetch calls by "METHOD path" without the query; the session is
 // always valid. Every statistics request is recorded with its query.
-function backend(statistics: Handler | Handler[]) {
+function backend(statistics: Handler | Handler[], cars: Car[] = [golf, honda]) {
   const requests: Record<string, string>[] = []
   const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
     const [pathname, search] = path.split('?')
@@ -70,7 +84,7 @@ function backend(statistics: Handler | Handler[]) {
     const key = `${init?.method ?? 'GET'} ${pathname}`
     if (key === 'GET /api/v1/session') return response(200, { profile })
     if (key === 'GET /api/v1/cars') {
-      return response(200, { items: [golf, honda], nextCursor: null })
+      return response(200, { items: cars, nextCursor: null })
     }
     if (key === 'GET /api/v1/stats/expenses') {
       requests.push(Object.fromEntries(query))
@@ -152,6 +166,56 @@ describe('dashboard', () => {
     expect(
       within(shortcuts).getByRole('link', { name: 'Add ticket' }),
     ).toHaveAttribute('href', '/tickets/create')
+  })
+
+  it('leaves deregistered cars out of the cards and the car filter', async () => {
+    const inactive = { ...golf, isActive: false }
+    const requests = backend(byYear, [inactive, leaving, sold])
+    renderApp('/home')
+
+    const cars = await screen.findByRole('region', { name: 'Your cars' })
+    expect(
+      within(cars)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['VW Golf', 'Honda CB500'])
+    const options = () =>
+      within(screen.getByRole('combobox', { name: 'Filter by car' }))
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    await waitFor(() =>
+      expect(options()).toEqual(['All cars', 'VW Golf', 'Honda CB500']),
+    )
+    // "All cars" statistics are not narrowed to the cars shown.
+    expect(requests.at(-1)).toEqual(yearToInstants(currentYear))
+  })
+
+  it('shows no cards when every car is deregistered', async () => {
+    backend(byYear, [sold])
+    renderApp('/home')
+
+    await screen.findByRole('slider', { name: `Expenses in ${currentYear}` })
+    expect(
+      screen.queryByRole('region', { name: 'Your cars' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps a deregistered car selected through the URL', async () => {
+    const requests = backend(byYear, [golf, sold])
+    renderApp(`/home?carId=${sold.id}`)
+
+    await screen.findByRole('slider', { name: `Expenses in ${currentYear}` })
+    await waitFor(() =>
+      expect(screen.getByLabelText('Filter by car')).toHaveValue(sold.id),
+    )
+    expect(requests.at(-1)).toEqual({
+      carId: sold.id,
+      ...yearToInstants(currentYear),
+    })
+    const cars = screen.getByRole('region', { name: 'Your cars' })
+    expect(
+      within(cars).queryByRole('link', { name: 'Ford Ka' }),
+    ).not.toBeInTheDocument()
   })
 
   it('moves between years and past the current one', async () => {

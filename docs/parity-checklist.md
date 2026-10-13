@@ -19,6 +19,8 @@ deleted; the `old/...` paths cited below can be read with
 - `DRV-nn` — a value the legacy app computes rather than stores.
 - `NG-nn` — a non-goal: something in the legacy app that is deliberately not a
   parity requirement, with the reason why.
+- `ADD-nn` — an intentional addition: behaviour the legacy app does not have,
+  adopted through its own proposal.
 
 Numbers are assigned once per prefix and never reused, so a citation
 ("covers `EP-12`, `EP-13`") stays valid as items are added. Later proposals
@@ -59,7 +61,8 @@ and tasks should cite ids rather than restating the items below.
   the resulting status message.
 - **SCR-09** — `/cars` (`old/pages/cars/index.tsx`). List of the caller's
   cars (`EP-07`), columns minus `isActive`/`fin`/`purchaseDate`; link to add
-  a new car; each row links to the car's detail and edit screens.
+  a new car; each row links to the car's detail and edit screens. The
+  rewrite also mutes inactive or deregistered rows (`ADD-03`).
 - **SCR-10** — `/cars/create` (`old/pages/cars/create.tsx`). Add-car form
   (type, make, name, fuel, first registration, license plate, FIN, purchase
   date, purchase price); submits to `EP-08`. Only type, make, name and fuel
@@ -308,6 +311,33 @@ Recorded, not resolved — each is a contract-shaped question that
    `SCR-13`, `SCR-11`, `SCR-02`, `EP-28`. Open question: do charts get
    their own unpaged/aggregated endpoint, or does the frontend accumulate
    pages before charting?
+
+## Intentional additions
+
+Behaviour the rewrite adds on top of parity. Each was adopted through its
+own OpenSpec change, cited after the item.
+
+- **ADD-01** — Editable active state. The legacy `isActive` flag is stored
+  and exposed by `EP-07`–`EP-10` but never shown or editable. The car forms
+  (`SCR-10`, `SCR-12`) offer it as a switch, on by default, and the car
+  detail Details tab (`SCR-11`) shows it. It only changes how the car's rows
+  look (`ADD-03`); it does not hide the car and is independent of
+  `ADD-02`. (`car-deregistration-and-info`)
+- **ADD-02** — Deregistration date and information. Cars gain an optional
+  deregistration date, which may not precede the first registration, and an
+  optional multi-line information text (at most 2000 characters). Both are
+  editable on `SCR-10`/`SCR-12` and shown on `SCR-11`, information with its
+  line breaks. (`car-deregistration-and-info`)
+- **ADD-03** — Hiding deregistered cars from selection. A car whose
+  deregistration date is today or earlier (viewer's local time zone) is not
+  offered as a dashboard card (`SCR-02`), in the dashboard and list car
+  filters (`SCR-02`, `SCR-13`, `SCR-16`, `SCR-19`, except a car already
+  selected through `carId`), or in the create forms' car field (`SCR-14`,
+  `SCR-17`, `SCR-20`, where such a `carId` preselects nothing). Its
+  cars-list row, its detail and edit screens, all its entries, and all
+  statistics stay unchanged. Rows of an inactive or deregistered car in the
+  cars, refuels, repairs, and tickets lists are muted and carry a text
+  badge. Filtering is client-side only. (`car-deregistration-and-info`)
 
 ## Non-goals
 

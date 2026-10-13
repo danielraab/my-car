@@ -26,6 +26,8 @@ const golf: Car = {
   isActive: true,
   purchaseDate: null,
   purchasePrice: null,
+  deregistrationDate: null,
+  information: null,
   createdAt: '2026-09-27T10:00:00Z',
   updatedAt: '2026-09-27T10:00:00Z',
 }
@@ -624,5 +626,90 @@ describe('repair editing', () => {
     expect(
       screen.queryByRole('button', { name: 'Delete repair' }),
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('repairs of inactive and deregistered cars', () => {
+  const inactive: Car = { ...zoe, isActive: false }
+  const sold: Car = {
+    ...golf,
+    id: 'c7d2e0a4-1b3f-4e5a-8c6d-7e8f9a0b1c2d',
+    make: 'Ford',
+    name: 'Ka',
+    deregistrationDate: '2020-01-01',
+  }
+  const soldEntry = {
+    ...service,
+    id: '6f9e4d3a-0c5b-4e8f-9a2b-3c4d5e6f7a81',
+    carId: sold.id,
+    station: 'Ford entry',
+  }
+  const cars = {
+    'GET /api/v1/cars?limit=100': () =>
+      response(200, { items: [golf, inactive, sold], nextCursor: null }),
+  }
+  const carOptions = (name: string) =>
+    within(screen.getByRole('combobox', { name }))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+
+  it('lists every entry, muting and badging those of such cars', async () => {
+    backend({
+      ...cars,
+      'GET /api/v1/repairs': () =>
+        response(200, {
+          items: [service, brakes, soldEntry],
+          nextCursor: null,
+        }),
+    })
+    renderApp('/repairs')
+
+    const table = await screen.findByRole('table', { name: 'Your repairs' })
+    const [, activeRow, inactiveRow, soldRow] =
+      within(table).getAllByRole('row')
+    expect(activeRow).not.toHaveClass('row-muted')
+    expect(inactiveRow).toHaveClass('row-muted')
+    expect(inactiveRow).toHaveTextContent('Inactive')
+    expect(soldRow).toHaveClass('row-muted')
+    expect(soldRow).toHaveTextContent('Ford entry')
+    expect(soldRow).toHaveTextContent('Deregistered')
+    await waitFor(() =>
+      expect(carOptions('Filter by car')).toEqual([
+        'All cars',
+        'VW Golf',
+        'Renault Zoe',
+      ]),
+    )
+  })
+
+  it('keeps a deregistered car selected through the URL', async () => {
+    backend({
+      ...cars,
+      [`GET /api/v1/repairs?carId=${sold.id}`]: () =>
+        response(200, { items: [soldEntry], nextCursor: null }),
+    })
+    renderApp(`/repairs?carId=${sold.id}`)
+
+    await screen.findByText('Ford entry')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Filter by car')).toHaveValue(sold.id),
+    )
+  })
+
+  it('offers only cars that are not deregistered on creation', async () => {
+    backend({ ...cars, ...noStations })
+    renderApp('/repairs/create')
+
+    await screen.findByRole('combobox', { name: 'Car' })
+    expect(carOptions('Car')).not.toContain('Ford Ka')
+    expect(carOptions('Car')).toContain('VW Golf')
+    expect(carOptions('Car')).toContain('Renault Zoe')
+  })
+
+  it('does not preselect a deregistered car named in carId', async () => {
+    backend({ ...cars, ...noStations })
+    renderApp(`/repairs/create?carId=${sold.id}`)
+
+    expect(await screen.findByRole('combobox', { name: 'Car' })).toHaveValue('')
   })
 })

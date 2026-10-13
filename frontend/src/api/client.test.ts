@@ -286,6 +286,8 @@ describe('cars API client', () => {
     isActive: true,
     purchaseDate: null,
     purchasePrice: '18500.50',
+    deregistrationDate: null,
+    information: null,
     createdAt: '2026-09-27T10:00:00Z',
     updatedAt: '2026-09-27T10:00:00Z',
   }

@@ -433,7 +433,7 @@ export interface components {
             /** @example validation_failed */
             code: string;
             message: string;
-            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), and `negative` (a numeric value below zero). */
+            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), `negative` (a numeric value below zero), and `before_first_registration` (a deregistration date earlier than the car's first registration). */
             fields?: {
                 [key: string]: string;
             };
@@ -524,6 +524,13 @@ export interface components {
             /** Format: date */
             purchaseDate?: string | null;
             purchasePrice?: components["schemas"]["NullableDecimal"];
+            /**
+             * Format: date
+             * @description Date the car was deregistered; it must not be earlier than `firstRegistration` when both are recorded (`before_first_registration`). Independent of `isActive`.
+             */
+            deregistrationDate?: string | null;
+            /** @description Free-form, possibly multi-line notes about the car. */
+            information?: string | null;
         };
         CarUpdate: {
             type?: string;
@@ -539,8 +546,15 @@ export interface components {
             /** Format: date */
             purchaseDate?: string | null;
             purchasePrice?: components["schemas"]["NullableDecimal"];
+            /**
+             * Format: date
+             * @description Date the car was deregistered; it must not be earlier than `firstRegistration` when both are recorded (`before_first_registration`). Independent of `isActive`.
+             */
+            deregistrationDate?: string | null;
+            /** @description Free-form, possibly multi-line notes about the car. */
+            information?: string | null;
         };
-        /** @description A car. Every member is always present; `firstRegistration`, `licensePlate`, `fin`, `purchaseDate`, and `purchasePrice` are `null` when not recorded. */
+        /** @description A car. Every member is always present; `firstRegistration`, `licensePlate`, `fin`, `purchaseDate`, `purchasePrice`, `deregistrationDate`, and `information` are `null` when not recorded. */
         Car: {
             id: components["schemas"]["UUID"];
             type: string;
@@ -556,6 +570,13 @@ export interface components {
             /** Format: date */
             purchaseDate: string | null;
             purchasePrice: components["schemas"]["NullableDecimal"];
+            /**
+             * Format: date
+             * @description Date the car was deregistered; it must not be earlier than `firstRegistration` when both are recorded (`before_first_registration`). Independent of `isActive`.
+             */
+            deregistrationDate: string | null;
+            /** @description Free-form, possibly multi-line notes about the car. */
+            information: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

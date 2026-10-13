@@ -40,9 +40,7 @@ function TicketsPage() {
   const cars = useQuery(allCarsQueryOptions)
   const items = tickets.data?.pages.flatMap((page) => page.items) ?? []
   const total = items.reduce((sum, ticket) => sum + Number(ticket.amount), 0)
-  const carNames = new Map(
-    cars.data?.items.map((car) => [car.id, `${car.make} ${car.name}`]),
-  )
+  const carsById = new Map(cars.data?.items.map((car) => [car.id, car]))
 
   return (
     <section className="list-page" aria-labelledby="tickets-title">
@@ -101,7 +99,7 @@ function TicketsPage() {
         </div>
       ) : (
         <>
-          <TicketTable items={items} carNames={carNames} total={total} />
+          <TicketTable items={items} cars={carsById} total={total} />
 
           {tickets.isFetchNextPageError ? (
             <p className="field-error" role="alert">

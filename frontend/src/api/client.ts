@@ -129,6 +129,8 @@ function isCar(value: unknown): value is Car {
       value.fin,
       value.purchaseDate,
       value.purchasePrice,
+      value.deregistrationDate,
+      value.information,
     ].every(isNullableString)
   )
 }

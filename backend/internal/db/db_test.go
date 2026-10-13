@@ -69,8 +69,8 @@ func TestRunMigrations(t *testing.T) {
 	if err := sqlDB.QueryRow("SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("query schema_migrations: %v", err)
 	}
-	if version != 6 {
-		t.Errorf("schema_migrations.version = %d, want 6", version)
+	if version != 7 {
+		t.Errorf("schema_migrations.version = %d, want 7", version)
 	}
 	if dirty {
 		t.Errorf("schema_migrations.dirty = true, want false")
@@ -120,6 +120,7 @@ func TestDomainSchema(t *testing.T) {
 	carID := insertCar(t, sqlDB, accountID)
 	assertRejected(t, sqlDB, "INSERT INTO cars (account_id, type, make, name, fuel, first_registration, license_plate) VALUES ($1, ' ', 'Ford', 'Focus', 'gasoline', '2020-01-01', 'AB-123')", accountID)
 	assertOptionalRegistration(t, sqlDB, accountID)
+	assertDeregistrationAndInformation(t, sqlDB, accountID)
 	assertPasskeySchema(t, sqlDB, accountID)
 
 	assertNullableOdometerAndNumericChecks(t, sqlDB, carID)
@@ -230,6 +231,29 @@ func assertOptionalRegistration(t *testing.T, sqlDB *sql.DB, accountID string) {
 		t.Errorf("first_registration = %v, license_plate = %v, want both NULL", registration, plate)
 	}
 	assertRejected(t, sqlDB, "INSERT INTO cars (account_id, type, make, name, fuel, license_plate) VALUES ($1, 'Car', 'Ford', 'Ka', 'gasoline', '  ')", accountID)
+}
+
+func assertDeregistrationAndInformation(t *testing.T, sqlDB *sql.DB, accountID string) {
+	t.Helper()
+	var deregistration sql.NullTime
+	var information sql.NullString
+	if err := sqlDB.QueryRow("INSERT INTO cars (account_id, type, make, name, fuel) VALUES ($1, 'Car', 'Ford', 'Puma', 'gasoline') RETURNING deregistration_date, information", accountID).Scan(&deregistration, &information); err != nil {
+		t.Fatalf("insert car without deregistration and information: %v", err)
+	}
+	if deregistration.Valid || information.Valid {
+		t.Errorf("deregistration_date = %v, information = %v, want both NULL", deregistration, information)
+	}
+	if err := sqlDB.QueryRow("INSERT INTO cars (account_id, type, make, name, fuel, first_registration, deregistration_date, information) VALUES ($1, 'Car', 'Ford', 'Puma', 'gasoline', '2020-01-01', '2020-01-01', 'Sold\nto a friend') RETURNING deregistration_date, information", accountID).Scan(&deregistration, &information); err != nil {
+		t.Fatalf("insert car with deregistration and information: %v", err)
+	}
+	if got := deregistration.Time.Format("2006-01-02"); !deregistration.Valid || got != "2020-01-01" {
+		t.Errorf("deregistration_date = %v, want 2020-01-01", deregistration)
+	}
+	if !information.Valid || information.String != "Sold\nto a friend" {
+		t.Errorf("information = %v, want the stored text", information)
+	}
+	assertRejected(t, sqlDB, "INSERT INTO cars (account_id, type, make, name, fuel, information) VALUES ($1, 'Car', 'Ford', 'Puma', 'gasoline', ' \n ')", accountID)
+	assertRejected(t, sqlDB, "INSERT INTO cars (account_id, type, make, name, fuel, first_registration, deregistration_date) VALUES ($1, 'Car', 'Ford', 'Puma', 'gasoline', '2020-01-02', '2020-01-01')", accountID)
 }
 
 func assertNullableOdometerAndNumericChecks(t *testing.T, sqlDB *sql.DB, carID string) {

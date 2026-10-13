@@ -30,6 +30,9 @@ const (
 	ReasonInvalidDecimal = "invalid_decimal"
 	ReasonNegative       = "negative"
 	ReasonNonPositive    = "non_positive"
+	// ReasonBeforeFirstRegistration rejects a deregistration date earlier
+	// than the car's first registration.
+	ReasonBeforeFirstRegistration = "before_first_registration"
 )
 
 // BodyField is the fields key for a problem with the request body as a whole.

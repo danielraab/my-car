@@ -193,6 +193,14 @@ export const resources = {
           fin: 'Vehicle identification number (FIN)',
           purchaseDate: 'Purchase date',
           purchasePrice: 'Purchase price',
+          isActive: 'Active',
+          deregistrationDate: 'Deregistration date',
+          information: 'Information',
+        },
+        states: {
+          active: 'Active',
+          inactive: 'Inactive',
+          deregistered: 'Deregistered',
         },
         fuels: {
           gasoline: 'Gasoline',
@@ -203,6 +211,9 @@ export const resources = {
         hints: {
           type: 'For example hatchback, estate or SUV.',
           purchasePrice: 'A number such as 18500.50.',
+          isActive: 'Inactive cars are shown muted but stay selectable.',
+          deregistrationDate:
+            'From this day on, the car is no longer offered for new entries.',
         },
         fieldErrors: {
           required: 'Fill in this field.',
@@ -212,6 +223,9 @@ export const resources = {
           invalid_decimal: 'Enter a number such as 18500.50.',
           negative: 'Enter an amount of zero or more.',
           invalid_type: 'Check the format of this value.',
+          too_long: 'Enter at most 2000 characters.',
+          before_first_registration:
+            'The deregistration date cannot be before the first registration.',
           invalid: 'Check this value.',
         },
         saveError: 'The car could not be saved. Please try again.',
@@ -787,6 +801,14 @@ export const resources = {
           fin: 'Fahrzeug-Identifizierungsnummer (FIN)',
           purchaseDate: 'Kaufdatum',
           purchasePrice: 'Kaufpreis',
+          isActive: 'Aktiv',
+          deregistrationDate: 'Abmeldedatum',
+          information: 'Informationen',
+        },
+        states: {
+          active: 'Aktiv',
+          inactive: 'Inaktiv',
+          deregistered: 'Abgemeldet',
         },
         fuels: {
           gasoline: 'Benzin',
@@ -797,6 +819,10 @@ export const resources = {
         hints: {
           type: 'Zum Beispiel Kleinwagen, Kombi oder SUV.',
           purchasePrice: 'Eine Zahl wie 18500,50.',
+          isActive:
+            'Inaktive Autos werden abgeblendet angezeigt, bleiben aber auswählbar.',
+          deregistrationDate:
+            'Ab diesem Tag wird das Auto für neue Einträge nicht mehr angeboten.',
         },
         fieldErrors: {
           required: 'Bitte fülle dieses Feld aus.',
@@ -806,6 +832,9 @@ export const resources = {
           invalid_decimal: 'Gib eine Zahl wie 18500,50 ein.',
           negative: 'Gib einen Betrag von null oder mehr ein.',
           invalid_type: 'Überprüfe das Format dieses Werts.',
+          too_long: 'Gib höchstens 2000 Zeichen ein.',
+          before_first_registration:
+            'Das Abmeldedatum darf nicht vor der Erstzulassung liegen.',
           invalid: 'Bitte überprüfe diesen Wert.',
         },
         saveError:

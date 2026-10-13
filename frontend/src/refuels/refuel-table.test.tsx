@@ -1,11 +1,29 @@
 import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import type { Refuel } from '#/api/client'
+import type { Car, Refuel } from '#/api/client'
 import '#/i18n'
 import { renderInRouter } from '#/test/render-in-router'
 
 import { RefuelTable } from './refuel-table'
+
+const golf: Car = {
+  id: '22222222-2222-2222-2222-222222222222',
+  type: 'Hatchback',
+  make: 'VW',
+  name: 'Golf',
+  fuel: 'diesel',
+  firstRegistration: '2019-03-01',
+  licensePlate: 'W-123AB',
+  fin: null,
+  isActive: true,
+  purchaseDate: null,
+  purchasePrice: null,
+  deregistrationDate: null,
+  information: null,
+  createdAt: '2026-09-27T10:00:00Z',
+  updatedAt: '2026-09-27T10:00:00Z',
+}
 
 const refuel: Refuel = {
   id: '33333333-3333-3333-3333-333333333333',
@@ -27,7 +45,7 @@ describe('RefuelTable', () => {
       <RefuelTable
         items={[refuel]}
         derived={new Map([[refuel.id, { ...refuel, consumption: '8' }]])}
-        carNames={new Map([[refuel.carId, 'VW Golf']])}
+        cars={new Map([[refuel.carId, golf]])}
         total={60}
       />,
     )
@@ -52,5 +70,35 @@ describe('RefuelTable', () => {
     expect(
       screen.queryByText('Total of the refuels shown'),
     ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [{ isActive: false }, 'Inactive'],
+    [{ deregistrationDate: '2020-01-01' }, 'Deregistered'],
+  ])('mutes and badges the row of a car with %o', async (change, badge) => {
+    await renderInRouter(
+      <RefuelTable
+        items={[refuel]}
+        derived={new Map()}
+        cars={new Map([[refuel.carId, { ...golf, ...change }]])}
+      />,
+    )
+    const row = (await screen.findAllByRole('row'))[1]
+    expect(row).toHaveClass('row-muted')
+    expect(row).toHaveTextContent(badge)
+    expect(screen.getByRole('link', { name: 'VW Golf' })).toBeInTheDocument()
+  })
+
+  it('does not mute the row of an active car', async () => {
+    await renderInRouter(
+      <RefuelTable
+        items={[refuel]}
+        derived={new Map()}
+        cars={new Map([[refuel.carId, golf]])}
+      />,
+    )
+    const row = (await screen.findAllByRole('row'))[1]
+    expect(row).not.toHaveClass('row-muted')
+    expect(row).not.toHaveTextContent(/Inactive|Deregistered/)
   })
 })

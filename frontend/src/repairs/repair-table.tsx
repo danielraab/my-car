@@ -1,25 +1,26 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import type { Repair } from '#/api/client'
-import { formatAmount } from '#/cars/format'
+import type { Car, Repair } from '#/api/client'
+import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
+import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
 
 // The repairs table shared by /repairs and a car's Expenses tab. Leaving out
-// carNames hides the car column; a total adds a footer row summing the
+// cars hides the car column; a total adds a footer row summing the
 // amounts.
 export function RepairTable({
   items,
-  carNames,
+  cars,
   total,
 }: {
   items: Repair[]
-  carNames?: Map<string, string>
+  cars?: Map<string, Car>
   total?: number
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
-  const showCar = carNames !== undefined
+  const showCar = cars !== undefined
 
   return (
     <div className="table-wrap">
@@ -41,7 +42,10 @@ export function RepairTable({
         </thead>
         <tbody>
           {items.map((repair) => (
-            <tr key={repair.id}>
+            <tr
+              key={repair.id}
+              className={carRowClass(cars?.get(repair.carId))}
+            >
               <td>
                 <Link
                   className="table-link"
@@ -54,8 +58,10 @@ export function RepairTable({
               {showCar ? (
                 <td>
                   <Link to="/cars/$carId" params={{ carId: repair.carId }}>
-                    {carNames.get(repair.carId) ?? t('repairs.unknownCar')}
+                    {carLabel(cars.get(repair.carId)) ??
+                      t('repairs.unknownCar')}
                   </Link>
+                  <CarStateBadge car={cars.get(repair.carId)} />
                 </td>
               ) : null}
               <td className="wrap">{repair.station}</td>

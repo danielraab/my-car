@@ -220,3 +220,53 @@ func TestStoreUpdateTriState(t *testing.T) {
 		t.Fatalf("update as other account err = %v", err)
 	}
 }
+
+func TestStoreDeregistrationAndInformation(t *testing.T) {
+	s, pool := testStore(t)
+	ctx := context.Background()
+	account := testAccount(t, pool)
+
+	plain, err := s.Create(ctx, account, validInput("Polo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.DeregistrationDate != nil || plain.Information != nil {
+		t.Fatalf("created = %+v, want no deregistration or information", plain)
+	}
+
+	in := validInput("Golf")
+	in.IsActive, in.DeregistrationDate, in.Information = false, ptr("2024-06-30"), ptr("Sold\nto Anna")
+	c, err := s.Create(ctx, account, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.IsActive || c.DeregistrationDate == nil || *c.DeregistrationDate != "2024-06-30" || c.Information == nil || *c.Information != "Sold\nto Anna" {
+		t.Fatalf("created = %+v", c)
+	}
+
+	active := true
+	updated, err := s.Update(ctx, account, c.ID, Patch{IsActive: &active})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.IsActive || updated.DeregistrationDate == nil || *updated.DeregistrationDate != "2024-06-30" || updated.Information == nil {
+		t.Fatalf("active-only update = %+v", updated)
+	}
+
+	cleared, err := s.Update(ctx, account, c.ID, Patch{DeregistrationDate: Nullable{Set: true}, Information: Nullable{Set: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.DeregistrationDate != nil || cleared.Information != nil || !cleared.IsActive {
+		t.Fatalf("cleared = %+v", cleared)
+	}
+
+	early := validInput("Ka")
+	early.DeregistrationDate = ptr("2019-02-28")
+	if _, err := s.Create(ctx, account, early); !errors.Is(err, ErrDeregistrationBeforeFirstRegistration) {
+		t.Fatalf("create out of order err = %v", err)
+	}
+	if _, err := s.Update(ctx, account, c.ID, Patch{DeregistrationDate: Nullable{Set: true, Value: ptr("2019-02-28")}}); !errors.Is(err, ErrDeregistrationBeforeFirstRegistration) {
+		t.Fatalf("update out of order err = %v", err)
+	}
+}

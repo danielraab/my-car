@@ -8,34 +8,44 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ErrNotFound reports a car that does not exist or belongs to another account.
 var ErrNotFound = errors.New("car not found")
 
+// ErrDeregistrationBeforeFirstRegistration reports a write rejected by the
+// database because the deregistration date precedes the first registration.
+var ErrDeregistrationBeforeFirstRegistration = errors.New("deregistration date before first registration")
+
+const dateOrderConstraint = "cars_deregistration_after_first_registration"
+
 // Car is a stored car. Dates are RFC 3339 full-dates and the price is a
 // decimal string, exactly as they appear on the wire.
 type Car struct {
-	ID                string
-	Type              string
-	Make              string
-	Name              string
-	Fuel              string
-	FirstRegistration *string
-	LicensePlate      *string
-	FIN               *string
-	IsActive          bool
-	PurchaseDate      *string
-	PurchasePrice     *string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID                 string
+	Type               string
+	Make               string
+	Name               string
+	Fuel               string
+	FirstRegistration  *string
+	LicensePlate       *string
+	FIN                *string
+	IsActive           bool
+	PurchaseDate       *string
+	PurchasePrice      *string
+	DeregistrationDate *string
+	Information        *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // Input is a validated car creation request.
 type Input struct {
 	Type, Make, Name, Fuel                                            string
 	FirstRegistration, LicensePlate, FIN, PurchaseDate, PurchasePrice *string
+	DeregistrationDate, Information                                   *string
 	IsActive                                                          bool
 }
 
@@ -51,6 +61,7 @@ type Patch struct {
 	Type, Make, Name, Fuel                                            *string
 	IsActive                                                          *bool
 	FirstRegistration, LicensePlate, FIN, PurchaseDate, PurchasePrice Nullable
+	DeregistrationDate, Information                                   Nullable
 }
 
 // Cursor is the keyset position of the last car on a page.
@@ -84,13 +95,17 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, created_at, updated_at`
+const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, to_char(deregistration_date, 'YYYY-MM-DD'), information, created_at, updated_at`
 
 func scanCar(row pgx.Row) (Car, error) {
 	var c Car
-	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.DeregistrationDate, &c.Information, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Car{}, ErrNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == dateOrderConstraint {
+		return Car{}, ErrDeregistrationBeforeFirstRegistration
 	}
 	return c, err
 }
@@ -129,10 +144,10 @@ func (s *Store) List(ctx context.Context, accountID string, after *Cursor, limit
 }
 
 func (s *Store) Create(ctx context.Context, accountID string, in Input) (Car, error) {
-	return scanCar(s.pool.QueryRow(ctx, `INSERT INTO cars (account_id, type, make, name, fuel, first_registration, license_plate, fin, is_active, purchase_date, purchase_price)
-VALUES ($1, $2, $3, $4, $5::text::vehicle_fuel, $6::text::date, $7, $8, $9, $10::text::date, $11::text::numeric)
+	return scanCar(s.pool.QueryRow(ctx, `INSERT INTO cars (account_id, type, make, name, fuel, first_registration, license_plate, fin, is_active, purchase_date, purchase_price, deregistration_date, information)
+VALUES ($1, $2, $3, $4, $5::text::vehicle_fuel, $6::text::date, $7, $8, $9, $10::text::date, $11::text::numeric, $12::text::date, $13)
 RETURNING `+columns,
-		accountID, in.Type, in.Make, in.Name, in.Fuel, in.FirstRegistration, in.LicensePlate, in.FIN, in.IsActive, in.PurchaseDate, in.PurchasePrice))
+		accountID, in.Type, in.Make, in.Name, in.Fuel, in.FirstRegistration, in.LicensePlate, in.FIN, in.IsActive, in.PurchaseDate, in.PurchasePrice, in.DeregistrationDate, in.Information))
 }
 
 func (s *Store) Get(ctx context.Context, accountID, carID string) (Car, error) {
@@ -153,12 +168,15 @@ func (s *Store) Update(ctx context.Context, accountID, carID string, p Patch) (C
   license_plate = CASE WHEN $10::boolean THEN $11 ELSE license_plate END,
   fin = CASE WHEN $12::boolean THEN $13 ELSE fin END,
   purchase_date = CASE WHEN $14::boolean THEN $15::text::date ELSE purchase_date END,
-  purchase_price = CASE WHEN $16::boolean THEN $17::text::numeric ELSE purchase_price END
+  purchase_price = CASE WHEN $16::boolean THEN $17::text::numeric ELSE purchase_price END,
+  deregistration_date = CASE WHEN $18::boolean THEN $19::text::date ELSE deregistration_date END,
+  information = CASE WHEN $20::boolean THEN $21 ELSE information END
 WHERE account_id = $1 AND id = $2
 RETURNING `+columns,
 		accountID, carID, p.Type, p.Make, p.Name, p.Fuel, p.IsActive,
 		p.FirstRegistration.Set, p.FirstRegistration.Value, p.LicensePlate.Set, p.LicensePlate.Value,
-		p.FIN.Set, p.FIN.Value, p.PurchaseDate.Set, p.PurchaseDate.Value, p.PurchasePrice.Set, p.PurchasePrice.Value))
+		p.FIN.Set, p.FIN.Value, p.PurchaseDate.Set, p.PurchaseDate.Value, p.PurchasePrice.Set, p.PurchasePrice.Value,
+		p.DeregistrationDate.Set, p.DeregistrationDate.Value, p.Information.Set, p.Information.Value))
 }
 
 func (s *Store) Delete(ctx context.Context, accountID, carID string) error {
