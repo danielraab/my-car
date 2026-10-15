@@ -31,6 +31,7 @@ services:
       retries: 10
 
   app:
+#    image: ghcr.io/danielraab/my-cars:latest
     build:
       context: .
       dockerfile: Dockerfile
