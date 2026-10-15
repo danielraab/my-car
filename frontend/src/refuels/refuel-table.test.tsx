@@ -57,7 +57,7 @@ describe('RefuelTable', () => {
     expect(screen.getByRole('link', { name: 'VW Golf' })).toBeInTheDocument()
     expect(screen.getByText('Total of the refuels shown')).toHaveAttribute(
       'colspan',
-      '7',
+      '6',
     )
     expect(screen.getByText('8 l/100 km')).toBeInTheDocument()
   })
@@ -68,7 +68,7 @@ describe('RefuelTable', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Car' }),
     ).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader')).toHaveLength(9)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(8)
     expect(
       screen.queryByText('Total of the refuels shown'),
     ).not.toBeInTheDocument()

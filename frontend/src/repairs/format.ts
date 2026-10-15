@@ -7,6 +7,13 @@ export function formatDateTime(value: string, locale: string): string {
   }).format(date)
 }
 
+// An instant shown as its calendar day in the viewer's zone.
+export function formatInstantDate(value: string, locale: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date)
+}
+
 function pad(value: number): string {
   return String(value).padStart(2, '0')
 }

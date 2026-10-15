@@ -5,7 +5,7 @@ import type { Car, Refuel } from '#/api/client'
 import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
 import { carLabel, formatAmount } from '#/cars/format'
-import { formatDateTime } from '#/repairs/format'
+import { formatInstantDate } from '#/repairs/format'
 
 function formatNumber(value: string, locale: string, fractionDigits: number) {
   const number = Number(value)
@@ -46,7 +46,6 @@ export function RefuelTable({
             <th scope="col" className="numeric">
               {t('refuels.odometerColumn')}
             </th>
-            <th scope="col">{t('refuels.fields.fuel')}</th>
             <th scope="col" className="numeric">
               {t('refuels.fields.liters')}
             </th>
@@ -78,7 +77,7 @@ export function RefuelTable({
                     to="/refuels/$refuelId/edit"
                     params={{ refuelId: refuel.id }}
                   >
-                    {formatDateTime(refuel.date, locale)}
+                    {formatInstantDate(refuel.date, locale)}
                   </Link>
                 </td>
                 {showCar ? (
@@ -100,7 +99,6 @@ export function RefuelTable({
                         ),
                       })}
                 </td>
-                <td>{t(`refuels.fuels.${refuel.fuel}`)}</td>
                 <td className="numeric">
                   {t('refuels.litersValue', {
                     value: formatNumber(refuel.liters, locale, 2),
@@ -132,7 +130,7 @@ export function RefuelTable({
         {total === undefined ? null : (
           <tfoot>
             <tr>
-              <td colSpan={showCar ? 7 : 6}>{t('refuels.total')}</td>
+              <td colSpan={showCar ? 6 : 5}>{t('refuels.total')}</td>
               <td className="numeric">{formatAmount(String(total), locale)}</td>
               <td />
               <td />

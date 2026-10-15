@@ -119,8 +119,8 @@ describe('refuels', () => {
     const rendered = renderApp('/refuels')
     const table = await screen.findByRole('table', { name: 'Your refuels' })
     expect(
-      within(table).getByRole('columnheader', { name: 'Fuel' }),
-    ).toBeInTheDocument()
+      within(table).queryByRole('columnheader', { name: 'Fuel' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('slider', { name: 'Fuel price history' }),
     ).toBeInTheDocument()
