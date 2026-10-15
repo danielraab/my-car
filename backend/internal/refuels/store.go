@@ -107,8 +107,8 @@ func scanRefuel(row pgx.Row) (Refuel, error) {
 }
 
 // List returns up to limit of the account's refuels matching the filter
-// after the cursor, ordered by date then ID, and the cursor of the next page
-// if there is one.
+// after the cursor, newest first (by date then ID, both descending), and
+// the cursor of the next page if there is one.
 func (s *Store) List(ctx context.Context, accountID string, f Filter, after *Cursor, limit int) ([]Refuel, *Cursor, error) {
 	var afterDate *time.Time
 	var afterID *string
@@ -120,8 +120,8 @@ WHERE `+owned+`
   AND ($2::uuid IS NULL OR car_id = $2::uuid)
   AND ($3::timestamptz IS NULL OR date >= $3::timestamptz)
   AND ($4::timestamptz IS NULL OR date < $4::timestamptz)
-  AND ($5::timestamptz IS NULL OR (date, id) > ($5::timestamptz, $6::uuid))
-ORDER BY date, id
+  AND ($5::timestamptz IS NULL OR (date, id) < ($5::timestamptz, $6::uuid))
+ORDER BY date DESC, id DESC
 LIMIT $7`, accountID, f.CarID, f.From, f.To, afterDate, afterID, limit+1)
 	if err != nil {
 		return nil, nil, err

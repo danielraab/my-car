@@ -99,7 +99,7 @@ func TestStoreListPaginatesAndFilters(t *testing.T) {
 		}
 		created = append(created, r)
 	}
-	byDate := []Ticket{created[2], created[1], created[0]}
+	byDate := []Ticket{created[0], created[1], created[2]} // newest first
 
 	page, next, err := s.List(ctx, account, Filter{}, nil, 2)
 	if err != nil {
@@ -130,6 +130,18 @@ func TestStoreListPaginatesAndFilters(t *testing.T) {
 	page, _, err = s.List(ctx, account, Filter{From: &from, To: &to}, nil, 10)
 	if err != nil || len(page) != 1 || page[0].ID != created[1].ID {
 		t.Fatalf("date range (from inclusive, to exclusive) = %v, %v", page, err)
+	}
+
+	// Same date: ties break by descending ID.
+	tieAccount, tieCar := testCar(t, pool)
+	for range 2 {
+		if _, err := s.Create(ctx, tieAccount, validInput(tieCar, 0, "Vienna")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page, _, err = s.List(ctx, tieAccount, Filter{}, nil, 10)
+	if err != nil || len(page) != 2 || page[0].ID < page[1].ID {
+		t.Fatalf("same-date tie = %v, %v", page, err)
 	}
 }
 

@@ -247,8 +247,8 @@ load-more states. The tab SHALL NOT show amount totals.
 #### Scenario: User views a car's expenses
 - **WHEN** the user opens the Expenses tab for a car with refuels, repairs,
   and tickets in the range
-- **THEN** each section lists only that car's records within the range, in
-  date order, without a car column
+- **THEN** each section lists only that car's records within the range,
+  newest first, without a car column
 
 #### Scenario: User adds a refuel from the car
 - **WHEN** the user selects the refuels section's "add new" action
@@ -262,7 +262,8 @@ load-more states. The tab SHALL NOT show amount totals.
 #### Scenario: Section has more records
 - **WHEN** a section's collection has another page and the user selects
   load more
-- **THEN** that section's rows append without affecting the other sections
+- **THEN** that section's older rows append below the loaded ones without
+  affecting the other sections
 
 ### Requirement: Consumption tab charts the car's consumption
 The Consumption tab SHALL show a localized line chart of the car's

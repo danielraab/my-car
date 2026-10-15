@@ -1643,7 +1643,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's refuels ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's refuels, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1722,7 +1722,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's repairs ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's repairs, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1774,7 +1774,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's tickets ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's tickets, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;
