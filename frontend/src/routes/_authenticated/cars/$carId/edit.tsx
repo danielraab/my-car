@@ -4,6 +4,7 @@ import { Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { type Car, type CarUpdate, deleteCar, updateCar } from '#/api/client'
+import { AttachmentManager } from '#/attachments/attachment-manager'
 import { CarForm } from '#/cars/car-form'
 import { CarStatus } from '#/cars/car-status'
 import { carQueryKey, carQueryOptions, carsListQueryKey } from '#/cars/queries'
@@ -85,6 +86,8 @@ function EditCar({ car }: { car: Car }) {
           </Link>
         }
       />
+
+      <AttachmentManager owner={{ kind: 'cars', id: car.id }} />
 
       <div className="form-card danger-zone">
         <TwoStepDeleteButton

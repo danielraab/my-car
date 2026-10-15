@@ -12,7 +12,7 @@ import (
 	"at.draab/my-car/internal/db"
 )
 
-const truncateAll = "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, refuels, repairs, tickets, cars, accounts"
+const truncateAll = "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, attachments, attachment_file_deletions, refuels, repairs, tickets, cars, accounts"
 
 // freshDatabase returns a pool on an emptied, migrated database, holding the
 // advisory lock the other data-clearing tests use.

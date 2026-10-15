@@ -87,12 +87,14 @@ type repairBody struct {
 	Type            string `json:"type"`
 	Amount          string `json:"amount"`
 	Description     string `json:"description"`
+	AttachmentCount int    `json:"attachmentCount"`
 }
 
 func toBody(r Repair) repairBody {
 	return repairBody{
 		ID: r.ID, CarID: r.CarID, Date: r.Date.UTC().Format(time.RFC3339Nano), Station: r.Station,
 		OdometerReading: r.OdometerReading, Type: r.Type, Amount: r.Amount, Description: r.Description,
+		AttachmentCount: r.AttachmentCount,
 	}
 }
 

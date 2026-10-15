@@ -7,3 +7,6 @@ static/out/*
 
 # Binary produced by `go build ./...`, named after the module.
 /my-car
+
+# Local attachment storage (FILE_STORAGE_PATH default).
+/data/

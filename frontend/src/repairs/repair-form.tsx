@@ -83,6 +83,8 @@ type RepairFormProps = {
   onSubmit: (input: RepairInput) => void
   onEdit: () => void
   secondaryAction?: ReactNode
+  // Rendered after the fields, such as the attachment queue of a create form.
+  attachments?: ReactNode
 }
 
 export function RepairForm({
@@ -97,6 +99,7 @@ export function RepairForm({
   onSubmit,
   onEdit,
   secondaryAction,
+  attachments,
 }: RepairFormProps) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() =>
@@ -294,6 +297,8 @@ export function RepairForm({
           { optional: true, wide: true },
         )}
       </div>
+
+      {attachments}
 
       {formError ? (
         <p className="field-error" role="alert">

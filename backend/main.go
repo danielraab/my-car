@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"at.draab/my-car/internal/attachments"
 	"at.draab/my-car/internal/auth"
 	"at.draab/my-car/internal/cars"
 	"at.draab/my-car/internal/config"
@@ -251,6 +252,14 @@ func runServer() {
 	mailer := auth.NewSMTPMailer(cfg.SMTPFrom, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPTLS, cfg.SMTPUser, cfg.SMTPPassword)
 	authService := auth.NewService(store, mailer, oidcClient, cfg.AuthBaseURL)
 	authService.ConfigureRateLimiting(cfg.TrustedProxies, cfg.RateLimitPerIP)
+	blobs, err := newBlobStore(ctx, cfg)
+	if err != nil {
+		fatal("configure file storage", err)
+	}
+	attachmentStore := attachments.NewStore(pool)
+	cleaner := attachments.NewCleaner(attachmentStore, blobs)
+	go cleaner.Run(ctx, time.Minute)
+	attachmentsHandler := attachments.NewHandler(attachmentStore, blobs, cfg.MaxUploadBytes, cleaner.Kick)
 	profileHandler := profile.NewHandler(profile.NewStore(pool))
 	carsHandler := cars.NewHandler(cars.NewStore(pool))
 	repairsHandler := repairs.NewHandler(repairs.NewStore(pool))
@@ -264,12 +273,41 @@ func runServer() {
 		refuelsHandler.RegisterRoutes(mux, authService.RequireSession)
 		ticketsHandler.RegisterRoutes(mux, authService.RequireSession)
 		statsHandler.RegisterRoutes(mux, authService.RequireSession)
+		attachmentsHandler.RegisterRoutes(mux, authService.RequireSession)
 	})
 
 	slog.Info("listening", "port", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, httpserver.Wrap(mux, cfg.LogRequests)); err != nil {
 		fatal("serve", err)
 	}
+}
+
+// newBlobStore opens the configured attachment storage and checks that it
+// is usable, so a misconfiguration stops startup instead of failing the
+// first upload. Errors name the variables to fix.
+func newBlobStore(ctx context.Context, cfg *config.Config) (attachments.BlobStore, error) {
+	if cfg.FileStorage == config.FileStorageS3 {
+		store, err := attachments.NewS3Store(cfg.S3)
+		if err != nil {
+			return nil, fmt.Errorf("S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY: %w", err)
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if err := store.Check(checkCtx); err != nil {
+			return nil, fmt.Errorf("S3 bucket is not usable (check S3_ENDPOINT, S3_BUCKET, S3_REGION and the credentials): %w", err)
+		}
+		slog.Info("file storage configured", "backend", "s3", "bucket", cfg.S3.Bucket)
+		return store, nil
+	}
+	store, err := attachments.NewLocalStore(cfg.FileStoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("FILE_STORAGE_PATH %q cannot be created: %w", cfg.FileStoragePath, err)
+	}
+	if err := store.Check(ctx); err != nil {
+		return nil, fmt.Errorf("FILE_STORAGE_PATH %q is not writable: %w", cfg.FileStoragePath, err)
+	}
+	slog.Info("file storage configured", "backend", "local", "path", cfg.FileStoragePath)
+	return store, nil
 }
 
 // fatal logs err at error level and exits, like log.Fatalf did.

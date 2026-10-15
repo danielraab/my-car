@@ -17,6 +17,7 @@ import {
   type RefuelInput,
   updateRefuel,
 } from '#/api/client'
+import { AttachmentManager } from '#/attachments/attachment-manager'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { TwoStepDeleteButton } from '#/components/two-step-delete-button'
 import {
@@ -151,6 +152,8 @@ function EditRefuel({ refuel, cars }: { refuel: Refuel; cars: Car[] }) {
           </Link>
         }
       />
+
+      <AttachmentManager owner={{ kind: 'refuels', id: refuel.id }} />
 
       <div className="form-card danger-zone">
         <TwoStepDeleteButton

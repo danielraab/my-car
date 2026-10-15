@@ -33,4 +33,9 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof getRouter>
   }
+  interface HistoryState {
+    // Files of a just-created entry that could not be uploaded, reported on
+    // its edit screen.
+    failedUploads?: string[]
+  }
 }

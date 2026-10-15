@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: my-car API
-  version: 2.2.0
+  version: 2.3.0
   description: |-
     REST API for the my-car rewrite.
 
@@ -704,6 +704,293 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         default:
           $ref: '#/components/responses/ServerError'
+  /cars/{carId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/CarId'
+    get:
+      tags:
+      - Attachments
+      operationId: listCarAttachments
+      responses:
+        '200':
+          description: All attachments of the car (at most 10), ordered by
+            upload time then ID; `nextCursor` is always `null`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+      - Attachments
+      operationId: uploadCarAttachment
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttachmentUpload'
+      responses:
+        '201':
+          description: Stored attachment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AttachmentLimitReached'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /refuels/{refuelId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/RefuelId'
+    get:
+      tags:
+      - Attachments
+      operationId: listRefuelAttachments
+      responses:
+        '200':
+          description: All attachments of the refuel (at most 10), ordered by
+            upload time then ID; `nextCursor` is always `null`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+      - Attachments
+      operationId: uploadRefuelAttachment
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttachmentUpload'
+      responses:
+        '201':
+          description: Stored attachment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AttachmentLimitReached'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /repairs/{repairId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/RepairId'
+    get:
+      tags:
+      - Attachments
+      operationId: listRepairAttachments
+      responses:
+        '200':
+          description: All attachments of the repair (at most 10), ordered by
+            upload time then ID; `nextCursor` is always `null`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+      - Attachments
+      operationId: uploadRepairAttachment
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttachmentUpload'
+      responses:
+        '201':
+          description: Stored attachment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AttachmentLimitReached'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /tickets/{ticketId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/TicketId'
+    get:
+      tags:
+      - Attachments
+      operationId: listTicketAttachments
+      responses:
+        '200':
+          description: All attachments of the ticket (at most 10), ordered by
+            upload time then ID; `nextCursor` is always `null`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+      - Attachments
+      operationId: uploadTicketAttachment
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttachmentUpload'
+      responses:
+        '201':
+          description: Stored attachment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AttachmentLimitReached'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /attachments/limits:
+    get:
+      tags:
+      - Attachments
+      operationId: getAttachmentLimits
+      responses:
+        '200':
+          description: Upload limits enforced by the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentLimits'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /attachments/{attachmentId}:
+    parameters:
+    - $ref: '#/components/parameters/AttachmentId'
+    delete:
+      tags:
+      - Attachments
+      operationId: deleteAttachment
+      responses:
+        '204':
+          description: Attachment and its stored file deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /attachments/{attachmentId}/content:
+    parameters:
+    - $ref: '#/components/parameters/AttachmentId'
+    get:
+      tags:
+      - Attachments
+      operationId: downloadAttachment
+      description: |-
+        Streams the stored file. The response carries
+        `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`,
+        `Cache-Control: private, no-store` and an inline
+        `Content-Disposition` with the original filename.
+      responses:
+        '200':
+          description: The file contents, with the attachment's content type.
+          headers:
+            Content-Disposition:
+              description: '`inline` with the original filename (RFC 6266).'
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                contentMediaType: image/jpeg
+            image/png:
+              schema:
+                type: string
+                contentMediaType: image/png
+            image/webp:
+              schema:
+                type: string
+                contentMediaType: image/webp
+            image/gif:
+              schema:
+                type: string
+                contentMediaType: image/gif
+            application/pdf:
+              schema:
+                type: string
+                contentMediaType: application/pdf
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/ServerError'
 components:
   securitySchemes:
     cookieSession:
@@ -752,6 +1039,12 @@ components:
         $ref: '#/components/schemas/UUID'
     TicketId:
       name: ticketId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/UUID'
+    AttachmentId:
+      name: attachmentId
       in: path
       required: true
       schema:
@@ -831,6 +1124,27 @@ components:
             $ref: '#/components/schemas/Error'
     Conflict:
       description: Request conflicts with existing state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    AttachmentLimitReached:
+      description: The entry already has the maximum number of attachments
+        (10); the error code is `attachment_limit_reached`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    FileTooLarge:
+      description: The file exceeds the maximum upload size; the error code is
+        `file_too_large`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedMediaType:
+      description: The file content is not a JPEG, PNG, WebP or GIF image or a
+        PDF document; the error code is `unsupported_media_type`.
       content:
         application/json:
           schema:
@@ -1120,6 +1434,82 @@ components:
           default:
             $ref: '#/components/responses/ServerError'
   schemas:
+    AttachmentContentType:
+      type: string
+      enum:
+      - image/jpeg
+      - image/png
+      - image/webp
+      - image/gif
+      - application/pdf
+    Attachment:
+      type: object
+      description: A file attached to a car, refuel, repair or ticket. Its
+        contents are downloaded from `/attachments/{attachmentId}/content`.
+      required:
+      - id
+      - filename
+      - contentType
+      - size
+      - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        filename:
+          type: string
+          maxLength: 255
+          description: Original file name without directories, for display.
+        contentType:
+          $ref: '#/components/schemas/AttachmentContentType'
+        size:
+          type: integer
+          minimum: 1
+          description: Size in bytes.
+        createdAt:
+          type: string
+          format: date-time
+    AttachmentPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/Attachment'
+        nextCursor:
+          type: 'null'
+    AttachmentUpload:
+      type: object
+      required:
+      - file
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          description: The file. Its type is detected from its content; only
+            JPEG, PNG, WebP and GIF images and PDF documents are accepted.
+    AttachmentLimits:
+      type: object
+      required:
+      - maxFileBytes
+      - maxFilesPerEntry
+      - allowedContentTypes
+      properties:
+        maxFileBytes:
+          type: integer
+          minimum: 1
+          description: Maximum size of one file in bytes (`MAX_UPLOAD_BYTES`).
+        maxFilesPerEntry:
+          type: integer
+          minimum: 1
+          description: Maximum number of attachments per entry.
+        allowedContentTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentContentType'
     UUID:
       type: string
       format: uuid
@@ -1445,6 +1835,7 @@ components:
         when not recorded.
       required:
       - id
+      - attachmentCount
       - type
       - make
       - name
@@ -1462,6 +1853,11 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/UUID'
+        attachmentCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Number of attachments of this entry.
         type:
           type: string
         make:
@@ -1593,6 +1989,7 @@ components:
       type: object
       required:
       - id
+      - attachmentCount
       - carId
       - date
       - station
@@ -1606,6 +2003,11 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/UUID'
+        attachmentCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Number of attachments of this entry.
         carId:
           $ref: '#/components/schemas/UUID'
         date:
@@ -1712,6 +2114,7 @@ components:
         is `null` and `description` is empty when not recorded.
       required:
       - id
+      - attachmentCount
       - carId
       - date
       - station
@@ -1722,6 +2125,11 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/UUID'
+        attachmentCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Number of attachments of this entry.
         carId:
           $ref: '#/components/schemas/UUID'
         date:
@@ -1812,6 +2220,7 @@ components:
         empty when not recorded.
       required:
       - id
+      - attachmentCount
       - carId
       - date
       - type
@@ -1821,6 +2230,11 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/UUID'
+        attachmentCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Number of attachments of this entry.
         carId:
           $ref: '#/components/schemas/UUID'
         date:

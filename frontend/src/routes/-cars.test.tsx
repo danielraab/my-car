@@ -15,6 +15,7 @@ const profile = {
 
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
+  attachmentCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -109,6 +110,7 @@ describe('cars list', () => {
       'First registration',
       'License plate',
       'Purchase price',
+      'Attachments',
     ])
     const rows = within(table).getAllByRole('row')
     expect(rows).toHaveLength(3)
@@ -267,6 +269,45 @@ describe('car creation', () => {
       'W-123AB',
     )
   }
+
+  it('uploads queued files and opens the detail screen with them', async () => {
+    const registration = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      filename: 'registration.pdf',
+      contentType: 'application/pdf',
+      size: 4,
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    const calls = backend({
+      'GET /api/v1/attachments/limits': () =>
+        response(200, {
+          maxFileBytes: 10485760,
+          maxFilesPerEntry: 10,
+          allowedContentTypes: ['application/pdf'],
+        }),
+      'POST /api/v1/cars': () => response(201, golf),
+      [`POST ${carPath}/attachments`]: () => response(201, registration),
+      [`GET ${carPath}`]: () => response(200, { ...golf, attachmentCount: 1 }),
+      [`GET ${carPath}/attachments`]: () =>
+        response(200, { items: [registration], nextCursor: null }),
+    })
+    const user = userEvent.setup()
+    const { router } = renderApp('/cars/create')
+
+    await fillRequired(user)
+    await user.upload(await screen.findByLabelText('Add files'), [
+      new File(['%PDF'], 'registration.pdf', { type: 'application/pdf' }),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Add car' }))
+
+    expect(
+      await screen.findByRole('link', { name: 'registration.pdf' }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(`/cars/${golf.id}`)
+    expect(
+      calls.filter((call) => call.key.startsWith('POST')).map((c) => c.key),
+    ).toEqual(['POST /api/v1/cars', `POST ${carPath}/attachments`])
+  })
 
   it('creates a car and opens its detail screen', async () => {
     const calls = backend({

@@ -3,7 +3,11 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { createRepair } from '#/api/client'
+import { createRepair, type RepairInput } from '#/api/client'
+import {
+  AttachmentQueue,
+  useAttachmentQueue,
+} from '#/attachments/attachment-queue'
 import { isDeregistered } from '#/cars/deregistration'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { CarsStatus } from '#/repairs/cars-status'
@@ -23,10 +27,27 @@ function CreateRepairPage() {
   const navigate = useNavigate()
   const cars = useQuery(allCarsQueryOptions)
   const stations = useQuery(repairStationsQueryOptions)
+  const queue = useAttachmentQueue()
   const create = useMutation({
-    mutationFn: createRepair,
-    onSuccess: () => {
+    // Queued files are uploaded once the repair exists; ones that fail are
+    // reported on its edit screen, since the repair itself is saved.
+    mutationFn: async (input: RepairInput) => {
+      const repair = await createRepair(input)
+      return {
+        repair,
+        failed: await queue.upload({ kind: 'repairs', id: repair.id }),
+      }
+    },
+    onSuccess: ({ repair, failed }) => {
       queryClient.removeQueries({ queryKey: repairsQueryKey })
+      if (failed.length > 0) {
+        void navigate({
+          to: '/repairs/$repairId/edit',
+          params: { repairId: repair.id },
+          state: { failedUploads: failed },
+        })
+        return
+      }
       void navigate({ to: '/repairs' })
     },
   })
@@ -60,6 +81,9 @@ function CreateRepairPage() {
           pending={create.isPending}
           error={create.error}
           onSubmit={(input) => create.mutate(input)}
+          attachments={
+            <AttachmentQueue queue={queue} disabled={create.isPending} />
+          }
           onEdit={() => {
             if (create.isError) create.reset()
           }}

@@ -79,19 +79,21 @@ func (h *Handler) withTicket(next func(http.ResponseWriter, *http.Request, strin
 }
 
 type ticketBody struct {
-	ID          string `json:"id"`
-	CarID       string `json:"carId"`
-	Date        string `json:"date"`
-	Type        string `json:"type"`
-	Location    string `json:"location"`
-	Amount      string `json:"amount"`
-	Description string `json:"description"`
+	ID              string `json:"id"`
+	CarID           string `json:"carId"`
+	Date            string `json:"date"`
+	Type            string `json:"type"`
+	Location        string `json:"location"`
+	Amount          string `json:"amount"`
+	Description     string `json:"description"`
+	AttachmentCount int    `json:"attachmentCount"`
 }
 
 func toBody(t Ticket) ticketBody {
 	return ticketBody{
 		ID: t.ID, CarID: t.CarID, Date: t.Date.UTC().Format(time.RFC3339Nano), Type: t.Type,
 		Location: t.Location, Amount: t.Amount, Description: t.Description,
+		AttachmentCount: t.AttachmentCount,
 	}
 }
 

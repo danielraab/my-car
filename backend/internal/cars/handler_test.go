@@ -510,3 +510,18 @@ func TestStoreFailureLogCorrelatesWithRequestID(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachmentCountIsReadOnly(t *testing.T) {
+	for _, req := range []struct{ method, target string }{{http.MethodPost, "/api/v1/cars"}, {http.MethodPatch, "/api/v1/cars/" + carID}} {
+		repo := &fakeRepository{}
+		rec := serve(t, repo, passSession, req.method, req.target, `{"type":"Car","make":"VW","name":"Golf","fuel":"diesel","attachmentCount":3}`)
+		fields, _ := decodeMap(t, rec)["fields"].(map[string]any)
+		if rec.Code != http.StatusBadRequest || fields["attachmentCount"] != apierror.ReasonUnknown || repo.calls != 0 {
+			t.Fatalf("%s: status = %d, body = %s; want 400 with attachmentCount unknown", req.method, rec.Code, rec.Body)
+		}
+	}
+	rec := serve(t, &fakeRepository{}, passSession, http.MethodGet, "/api/v1/cars/"+carID, "")
+	if body := decodeMap(t, rec); body["attachmentCount"] != float64(0) {
+		t.Fatalf("car body = %v, want attachmentCount 0", body)
+	}
+}

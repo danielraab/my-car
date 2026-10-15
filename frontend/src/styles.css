@@ -1814,3 +1814,176 @@ select:focus-visible {
     width: 100%;
   }
 }
+
+/* Attachments: the upload part of the forms, the edit screens' attachment
+   card, the list rows' paperclip popover and the car Details section. */
+.attachment-section {
+  margin-top: 1.4rem;
+}
+
+.attachment-section h2,
+.attachment-overview h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.1rem;
+}
+
+.attachment-section-inline {
+  margin: 0.4rem 0 1.2rem;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.attachment-section-inline legend {
+  padding: 0 0.5rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.attachment-overview {
+  margin: 0 0 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
+}
+
+.attachment-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  min-height: 2.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.attachment-item:last-child {
+  border-bottom: 0;
+}
+
+.attachment-type {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.attachment-name {
+  min-width: 0;
+  flex: 1 1 10rem;
+  overflow-wrap: anywhere;
+}
+
+.attachment-size {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.attachment-actions {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+}
+
+.attachment-delete {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: end;
+}
+
+.attachment-picker label.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.attachment-picker:has(input:focus-visible) label {
+  outline: 3px solid rgb(145 194 12 / 45%);
+  outline-offset: 3px;
+}
+
+.attachment-errors {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.attachment-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.attachment-status p {
+  margin: 0;
+}
+
+.data-table .attachment-cell {
+  width: 1%;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  text-align: right;
+}
+
+.attachment-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.attachment-indicator:hover,
+.attachment-indicator[data-open] {
+  border-color: var(--accent-dark);
+}
+
+.attachment-indicator:focus-visible {
+  outline: 3px solid rgb(145 194 12 / 45%);
+  outline-offset: 2px;
+}
+
+.attachment-panel {
+  z-index: 30;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.6rem 0.9rem;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 18px 40px rgb(28 48 41 / 16%);
+  --anchor-gap: 0.4rem;
+}
+
+.attachment-panel .attachment-list {
+  margin: 0;
+}
+
+.attachment-panel p {
+  margin: 0.4rem 0;
+}

@@ -37,6 +37,7 @@ type Car struct {
 	PurchasePrice      *string
 	DeregistrationDate *string
 	Information        *string
+	AttachmentCount    int
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -95,11 +96,11 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, to_char(deregistration_date, 'YYYY-MM-DD'), information, created_at, updated_at`
+const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, to_char(deregistration_date, 'YYYY-MM-DD'), information, (SELECT count(*) FROM attachments a WHERE a.car_id = cars.id), created_at, updated_at`
 
 func scanCar(row pgx.Row) (Car, error) {
 	var c Car
-	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.DeregistrationDate, &c.Information, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.DeregistrationDate, &c.Information, &c.AttachmentCount, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Car{}, ErrNotFound
 	}

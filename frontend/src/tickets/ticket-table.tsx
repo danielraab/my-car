@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { Car, Ticket } from '#/api/client'
+import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
 import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
@@ -35,6 +36,9 @@ export function TicketTable({
             <th scope="col" className="numeric">
               {t('tickets.fields.amount')}
             </th>
+            <th scope="col">
+              <span className="sr-only">{t('attachments.title')}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -64,6 +68,12 @@ export function TicketTable({
               <td>{t(`tickets.types.${ticket.type}`)}</td>
               <td className="wrap">{ticket.location}</td>
               <td className="numeric">{formatAmount(ticket.amount, locale)}</td>
+              <td className="attachment-cell">
+                <AttachmentIndicator
+                  owner={{ kind: 'tickets', id: ticket.id }}
+                  count={ticket.attachmentCount}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -72,6 +82,7 @@ export function TicketTable({
             <tr>
               <td colSpan={showCar ? 4 : 3}>{t('tickets.total')}</td>
               <td className="numeric">{formatAmount(String(total), locale)}</td>
+              <td />
             </tr>
           </tfoot>
         )}

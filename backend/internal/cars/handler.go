@@ -93,6 +93,7 @@ type carBody struct {
 	PurchasePrice      *string `json:"purchasePrice"`
 	DeregistrationDate *string `json:"deregistrationDate"`
 	Information        *string `json:"information"`
+	AttachmentCount    int     `json:"attachmentCount"`
 	CreatedAt          string  `json:"createdAt"`
 	UpdatedAt          string  `json:"updatedAt"`
 }
@@ -102,7 +103,7 @@ func toBody(c Car) carBody {
 		ID: c.ID, Type: c.Type, Make: c.Make, Name: c.Name, Fuel: c.Fuel,
 		FirstRegistration: c.FirstRegistration, LicensePlate: c.LicensePlate, FIN: c.FIN,
 		IsActive: c.IsActive, PurchaseDate: c.PurchaseDate, PurchasePrice: c.PurchasePrice,
-		DeregistrationDate: c.DeregistrationDate, Information: c.Information,
+		DeregistrationDate: c.DeregistrationDate, Information: c.Information, AttachmentCount: c.AttachmentCount,
 		CreatedAt: c.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: c.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }

@@ -27,10 +27,17 @@ func Run(ctx context.Context, pool *pgxpool.Pool, emails []string, now time.Time
 		return fmt.Errorf("begin seed: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	// TRUNCATE fires no delete triggers, so the stored files of the removed
+	// attachments are queued for removal explicitly; the server removes them.
+	_, err = tx.Exec(ctx, `INSERT INTO attachment_file_deletions (storage_key)
+		SELECT storage_key FROM attachments ON CONFLICT (storage_key) DO NOTHING`)
+	if err != nil {
+		return fmt.Errorf("queue attachment files: %w", err)
+	}
 	// Explicit list protects migration history and unrelated tables.
 	_, err = tx.Exec(ctx, `TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials,
-		oidc_identities, oidc_login_attempts, magic_link_challenges, refuels, repairs,
-		tickets, cars, accounts`)
+		oidc_identities, oidc_login_attempts, magic_link_challenges, attachments, refuels,
+		repairs, tickets, cars, accounts`)
 	if err != nil {
 		return fmt.Errorf("clear application data: %w", err)
 	}

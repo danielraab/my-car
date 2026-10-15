@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { CarFront, LoaderCircle, Plus, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge } from '#/cars/car-state-badge'
 import { isCarMuted } from '#/cars/deregistration'
 import { formatAmount, formatDate } from '#/cars/format'
@@ -74,6 +75,9 @@ function CarsPage() {
                   <th scope="col" className="numeric">
                     {t('cars.fields.purchasePrice')}
                   </th>
+                  <th scope="col">
+                    <span className="sr-only">{t('attachments.title')}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -105,6 +109,12 @@ function CarsPage() {
                       {car.purchasePrice === null
                         ? t('cars.notRecorded')
                         : formatAmount(car.purchasePrice, locale)}
+                    </td>
+                    <td className="attachment-cell">
+                      <AttachmentIndicator
+                        owner={{ kind: 'cars', id: car.id }}
+                        count={car.attachmentCount}
+                      />
                     </td>
                   </tr>
                 ))}

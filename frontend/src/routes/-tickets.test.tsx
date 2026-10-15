@@ -16,6 +16,7 @@ const profile = {
 
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
+  attachmentCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -41,6 +42,7 @@ const zoe: Car = {
 
 const parking: Ticket = {
   id: '4d7c2b1e-8a3f-4c6d-9e0f-1a2b3c4d5e6f',
+  attachmentCount: 0,
   carId: golf.id,
   date: '2026-03-14T08:15:00Z',
   type: 'parking',
@@ -152,6 +154,7 @@ describe('tickets list', () => {
       'Type',
       'Location',
       'Amount',
+      'Attachments',
     ])
     const rows = within(table).getAllByRole('row')
     expect(rows).toHaveLength(4)

@@ -17,6 +17,7 @@ import {
   type TicketInput,
   updateTicket,
 } from '#/api/client'
+import { AttachmentManager } from '#/attachments/attachment-manager'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { TwoStepDeleteButton } from '#/components/two-step-delete-button'
 import { CarsStatus } from '#/repairs/cars-status'
@@ -151,6 +152,8 @@ function EditTicket({ ticket, cars }: { ticket: Ticket; cars: Car[] }) {
           </Link>
         }
       />
+
+      <AttachmentManager owner={{ kind: 'tickets', id: ticket.id }} />
 
       <div className="form-card danger-zone">
         <TwoStepDeleteButton

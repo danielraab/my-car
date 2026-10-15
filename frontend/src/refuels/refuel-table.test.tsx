@@ -9,6 +9,7 @@ import { RefuelTable } from './refuel-table'
 
 const golf: Car = {
   id: '22222222-2222-2222-2222-222222222222',
+  attachmentCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -27,6 +28,7 @@ const golf: Car = {
 
 const refuel: Refuel = {
   id: '33333333-3333-3333-3333-333333333333',
+  attachmentCount: 0,
   carId: '22222222-2222-2222-2222-222222222222',
   date: '2026-09-28T10:00:00Z',
   station: 'Fuel',
@@ -66,7 +68,7 @@ describe('RefuelTable', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Car' }),
     ).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader')).toHaveLength(8)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(9)
     expect(
       screen.queryByText('Total of the refuels shown'),
     ).not.toBeInTheDocument()

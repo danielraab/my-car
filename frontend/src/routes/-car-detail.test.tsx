@@ -16,6 +16,7 @@ const profile = {
 
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
+  attachmentCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -34,6 +35,7 @@ const golf: Car = {
 
 const refuel: Refuel = {
   id: '33333333-3333-3333-3333-333333333333',
+  attachmentCount: 0,
   carId: golf.id,
   date: '2026-09-01T10:00:00Z',
   station: 'Shell Wien',
@@ -57,6 +59,7 @@ const earlier: Refuel = {
 
 const repair: Repair = {
   id: '4d7c2b1e-8a3f-4c6d-9e0f-1a2b3c4d5e6f',
+  attachmentCount: 0,
   carId: golf.id,
   date: '2026-08-14T08:15:00Z',
   station: 'Garage Huber',
@@ -68,6 +71,7 @@ const repair: Repair = {
 
 const ticket: Ticket = {
   id: '5e8d3c2f-9b4a-4d7e-8f1a-2b3c4d5e6f70',
+  attachmentCount: 0,
   carId: golf.id,
   date: '2026-07-02T14:00:00Z',
   type: 'parking',
@@ -85,7 +89,10 @@ function response(status: number, body?: unknown) {
 }
 
 type Routes = Partial<
-  Record<'car' | 'refuels' | 'chart' | 'repairs' | 'tickets', () => Response>
+  Record<
+    'car' | 'refuels' | 'chart' | 'repairs' | 'tickets' | 'attachments',
+    () => Response
+  >
 >
 
 // Answers by path without its query, so tests can inspect the query in the
@@ -101,6 +108,7 @@ function backend(routes: Routes = {}) {
       routes.chart ?? (() => response(200, { items: [earlier, refuel] })),
     '/api/v1/repairs': routes.repairs ?? page([repair]),
     '/api/v1/tickets': routes.tickets ?? page([ticket]),
+    [`/api/v1/cars/${golf.id}/attachments`]: routes.attachments ?? page([]),
   }
   vi.stubGlobal(
     'fetch',
@@ -132,6 +140,45 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   document.documentElement.lang = 'en'
   vi.unstubAllGlobals()
+})
+
+describe('car attachments', () => {
+  it("lists the car's own attachments on the Details tab", async () => {
+    backend({
+      attachments: () =>
+        response(200, {
+          items: [
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              filename: 'registration.pdf',
+              contentType: 'application/pdf',
+              size: 2048,
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+          nextCursor: null,
+        }),
+    })
+    renderApp(`/cars/${golf.id}`)
+
+    const section = await screen.findByRole('region', { name: 'Attachments' })
+    const link = await within(section).findByRole('link', {
+      name: 'registration.pdf',
+    })
+    expect(link).toHaveAttribute(
+      'href',
+      '/api/v1/attachments/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/content',
+    )
+    expect(within(section).getByText('PDF document')).toBeInTheDocument()
+  })
+
+  it('says when the car has no attachments, in both languages', async () => {
+    backend()
+    renderApp(`/cars/${golf.id}`)
+    expect(await screen.findByText('No attachments.')).toBeInTheDocument()
+    await i18n.changeLanguage('de')
+    expect(await screen.findByText('Keine Anhänge.')).toBeInTheDocument()
+  })
 })
 
 describe('car detail tabs', () => {

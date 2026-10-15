@@ -54,6 +54,9 @@ func TestLoad_AllPresent(t *testing.T) {
 		RateLimitPerIP:   true,
 		LogLevel:         slog.LevelInfo,
 		LogRequests:      RequestLogAll,
+		FileStorage:      FileStorageLocal,
+		FileStoragePath:  DefaultFileStoragePath,
+		MaxUploadBytes:   DefaultMaxUploadBytes,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("Load() = %+v, want %+v", *cfg, *want)
@@ -246,6 +249,90 @@ func TestLoad_LogRequests(t *testing.T) {
 		t.Setenv("LOG_REQUESTS", raw)
 		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "LOG_REQUESTS") {
 			t.Errorf("%q: error = %v, want one naming LOG_REQUESTS", raw, err)
+		}
+	}
+}
+
+func setS3Env(t *testing.T) {
+	t.Helper()
+	t.Setenv("FILE_STORAGE", "s3")
+	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("S3_BUCKET", "my-cars")
+	t.Setenv("S3_ACCESS_KEY_ID", "key")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret")
+}
+
+func TestLoad_FileStorageDefaultsToLocal(t *testing.T) {
+	setAllEnv(t)
+	t.Setenv("S3_BUCKET", "ignored")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.FileStorage != FileStorageLocal || cfg.FileStoragePath != DefaultFileStoragePath || cfg.S3 != (S3Config{}) {
+		t.Fatalf("Load() storage = %q %q %+v, want local default without S3", cfg.FileStorage, cfg.FileStoragePath, cfg.S3)
+	}
+
+	t.Setenv("FILE_STORAGE", "local")
+	t.Setenv("FILE_STORAGE_PATH", "/data/files")
+	cfg, err = Load()
+	if err != nil || cfg.FileStoragePath != "/data/files" {
+		t.Fatalf("Load() = %+v, err %v; want FileStoragePath /data/files", cfg, err)
+	}
+}
+
+func TestLoad_FileStorageS3(t *testing.T) {
+	setAllEnv(t)
+	setS3Env(t)
+	t.Setenv("S3_REGION", "eu-central-1")
+	t.Setenv("S3_USE_PATH_STYLE", "true")
+	t.Setenv("S3_PREFIX", "my-cars/")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := S3Config{Endpoint: "https://s3.example.com", Region: "eu-central-1", Bucket: "my-cars", AccessKeyID: "key", SecretAccessKey: "secret", UsePathStyle: true, Prefix: "my-cars/"}
+	if cfg.FileStorage != FileStorageS3 || cfg.S3 != want {
+		t.Fatalf("Load() storage = %q %+v, want s3 %+v", cfg.FileStorage, cfg.S3, want)
+	}
+}
+
+func TestLoad_RejectsInvalidFileStorage(t *testing.T) {
+	cases := []struct {
+		key, value, wantInError string
+	}{
+		{"FILE_STORAGE", "ftp", "FILE_STORAGE"},
+		{"S3_ENDPOINT", "", "S3_ENDPOINT"},
+		{"S3_BUCKET", "", "S3_BUCKET"},
+		{"S3_ACCESS_KEY_ID", "", "S3_ACCESS_KEY_ID"},
+		{"S3_SECRET_ACCESS_KEY", "", "S3_SECRET_ACCESS_KEY"},
+		{"S3_ENDPOINT", "s3.example.com", "S3_ENDPOINT"},
+		{"S3_USE_PATH_STYLE", "yes", "S3_USE_PATH_STYLE"},
+	}
+	for _, tc := range cases {
+		setAllEnv(t)
+		setS3Env(t)
+		t.Setenv(tc.key, tc.value)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), tc.wantInError) {
+			t.Errorf("%s=%q: error = %v, want one naming %s", tc.key, tc.value, err, tc.wantInError)
+		}
+	}
+}
+
+func TestLoad_MaxUploadBytes(t *testing.T) {
+	for raw, want := range map[string]int64{"": DefaultMaxUploadBytes, "1048576": 1 << 20} {
+		setAllEnv(t)
+		t.Setenv("MAX_UPLOAD_BYTES", raw)
+		cfg, err := Load()
+		if err != nil || cfg.MaxUploadBytes != want {
+			t.Errorf("%q: Load() = %+v, err %v; want MaxUploadBytes %d", raw, cfg, err, want)
+		}
+	}
+	for _, raw := range []string{"10MB", "0", "-1"} {
+		setAllEnv(t)
+		t.Setenv("MAX_UPLOAD_BYTES", raw)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "MAX_UPLOAD_BYTES") {
+			t.Errorf("%q: error = %v, want one naming MAX_UPLOAD_BYTES", raw, err)
 		}
 	}
 }

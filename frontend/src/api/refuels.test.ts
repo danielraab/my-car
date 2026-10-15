@@ -8,6 +8,7 @@ const ok = (body: unknown) =>
   })
 const item = {
   id: '33333333-3333-3333-3333-333333333333',
+  attachmentCount: 0,
   carId: '22222222-2222-2222-2222-222222222222',
   date: '2026-09-28T10:00:00Z',
   station: 'Fuel',

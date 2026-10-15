@@ -70,6 +70,8 @@ type TicketFormProps = {
   onSubmit: (input: TicketInput) => void
   onEdit: () => void
   secondaryAction?: ReactNode
+  // Rendered after the fields, such as the attachment queue of a create form.
+  attachments?: ReactNode
 }
 
 export function TicketForm({
@@ -84,6 +86,7 @@ export function TicketForm({
   onSubmit,
   onEdit,
   secondaryAction,
+  attachments,
 }: TicketFormProps) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() =>
@@ -259,6 +262,8 @@ export function TicketForm({
           { optional: true, wide: true },
         )}
       </div>
+
+      {attachments}
 
       {formError ? (
         <p className="field-error" role="alert">

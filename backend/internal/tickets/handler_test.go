@@ -134,12 +134,12 @@ func TestCreateTicket(t *testing.T) {
 		t.Fatalf("store input = %+v for %s", in, repo.account)
 	}
 	body := decodeMap(t, rec)
-	for _, key := range []string{"id", "carId", "date", "type", "location", "amount", "description"} {
+	for _, key := range []string{"id", "carId", "date", "type", "location", "amount", "description", "attachmentCount"} {
 		if _, ok := body[key]; !ok {
 			t.Fatalf("ticket member %q missing: %v", key, body)
 		}
 	}
-	if len(body) != 7 || body["description"] != "" || body["date"] != "2026-09-27T10:30:00Z" {
+	if len(body) != 8 || body["description"] != "" || body["date"] != "2026-09-27T10:30:00Z" {
 		t.Fatalf("body = %v", body)
 	}
 }

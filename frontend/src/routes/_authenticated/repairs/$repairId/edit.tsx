@@ -17,6 +17,7 @@ import {
   type RepairInput,
   updateRepair,
 } from '#/api/client'
+import { AttachmentManager } from '#/attachments/attachment-manager'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { TwoStepDeleteButton } from '#/components/two-step-delete-button'
 import { CarsStatus } from '#/repairs/cars-status'
@@ -151,6 +152,8 @@ function EditRepair({ repair, cars }: { repair: Repair; cars: Car[] }) {
           </Link>
         }
       />
+
+      <AttachmentManager owner={{ kind: 'repairs', id: repair.id }} />
 
       <div className="form-card danger-zone">
         <TwoStepDeleteButton

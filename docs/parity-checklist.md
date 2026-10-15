@@ -338,6 +338,16 @@ own OpenSpec change, cited after the item.
   statistics stay unchanged. Rows of an inactive or deregistered car in the
   cars, refuels, repairs, and tickets lists are muted and carry a text
   badge. Filtering is client-side only. (`car-deregistration-and-info`)
+- **ADD-04** — Attachments. Cars, refuels, repairs, and tickets can each hold
+  up to 10 files: JPEG, PNG, WebP, or GIF images and PDF documents, detected
+  from the file content, at most `MAX_UPLOAD_BYTES` (default 10 MB) each.
+  Files are added on the create and edit forms (`SCR-10`, `SCR-12`, `SCR-14`,
+  `SCR-15`, `SCR-17`, `SCR-18`, `SCR-20`, `SCR-21`); large images are scaled
+  down in the browser first. Lists (`SCR-09`, `SCR-13`, `SCR-16`, `SCR-19`,
+  and the `SCR-11` Expenses tab) show a clickable attachment indicator, and
+  the `SCR-11` Details tab lists the car's files. Files are stored on the
+  backend's filesystem or in S3 and are only served to the owning account.
+  (`add-attachments`)
 
 ## Non-goals
 

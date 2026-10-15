@@ -119,6 +119,35 @@ pnpm check:api   # generated API types match openapi/openapi.yaml
 
 If `check:api` fails, regenerate the types with `pnpm generate:api`.
 
+**File storage**
+
+Files attached to cars, refuels, repairs and tickets (JPEG, PNG, WebP and
+GIF images and PDF documents, at most `MAX_UPLOAD_BYTES` each, default
+10 MB) are stored outside the database:
+
+- `FILE_STORAGE=local` (default) keeps them below `FILE_STORAGE_PATH`
+  (default `./data/files`; `/data/files` in the container image). Mount a
+  volume there, as `docker-compose.yml` does, or files are lost when the
+  container is recreated.
+- `FILE_STORAGE=s3` keeps them in an S3-compatible bucket configured by the
+  `S3_*` variables (see `backend/.env.example`). Block public access on the
+  bucket: files are only ever served through the backend, to their owner.
+  The compose `dev` profile runs MinIO on port 9000 with a `my-cars` bucket
+  for trying this out.
+
+The backend refuses to start if the storage is not usable. A complete backup
+consists of the database **and** the file storage. Storage keys do not
+depend on the backend, so moving between local storage and S3 is a manual
+copy of all files under the same keys; there is no built-in migration.
+To run the S3 integration test against the compose MinIO:
+
+```bash
+cd backend
+S3_TEST_ENDPOINT=http://localhost:9000 S3_TEST_BUCKET=my-cars \
+  S3_TEST_ACCESS_KEY_ID=mycars S3_TEST_SECRET_ACCESS_KEY=mycars-secret \
+  go test ./internal/attachments/
+```
+
 ## Development workflow
 
 This project follows **spec-driven development with [OpenSpec](openspec/)**.

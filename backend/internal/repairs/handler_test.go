@@ -383,3 +383,13 @@ func TestRepairsRequireSessionOnTopLevelMux(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachmentCountIsReadOnly(t *testing.T) {
+	repo := &fakeRepository{}
+	body := strings.TrimSuffix(validCreate, "}") + `,"attachmentCount":1}`
+	rec := serve(t, repo, passSession, http.MethodPost, "/api/v1/repairs", body)
+	fields, _ := decodeMap(t, rec)["fields"].(map[string]any)
+	if rec.Code != http.StatusBadRequest || fields["attachmentCount"] != "unknown" {
+		t.Fatalf("status = %d, body = %s; want 400 with attachmentCount unknown", rec.Code, rec.Body)
+	}
+}

@@ -9,6 +9,7 @@ import { RepairTable } from './repair-table'
 
 const golf: Car = {
   id: '22222222-2222-2222-2222-222222222222',
+  attachmentCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -27,6 +28,7 @@ const golf: Car = {
 
 const item: Repair = {
   id: '4d7c2b1e-8a3f-4c6d-9e0f-1a2b3c4d5e6f',
+  attachmentCount: 0,
   carId: '22222222-2222-2222-2222-222222222222',
   date: '2026-03-14T08:15:00Z',
   station: 'Garage Huber',
@@ -61,7 +63,7 @@ describe('RepairTable', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Car' }),
     ).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader')).toHaveLength(5)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(6)
     expect(
       screen.queryByText('Total of the repairs shown'),
     ).not.toBeInTheDocument()

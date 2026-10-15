@@ -276,6 +276,7 @@ describe('API client', () => {
 describe('cars API client', () => {
   const car = {
     id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
+    attachmentCount: 0,
     type: 'Hatchback',
     make: 'VW',
     name: 'Golf',
@@ -399,6 +400,7 @@ describe('cars API client', () => {
 describe('repairs API client', () => {
   const repair = {
     id: '4d7c2b1e-8a3f-4c6d-9e0f-1a2b3c4d5e6f',
+    attachmentCount: 0,
     carId: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
     date: '2026-09-27T10:30:00Z',
     station: 'Garage',
@@ -531,6 +533,7 @@ describe('repairs API client', () => {
 describe('tickets API client', () => {
   const ticket = {
     id: '5e8d3c2f-9b4a-4d7e-8f1a-2b3c4d5e6f70',
+    attachmentCount: 0,
     carId: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
     date: '2026-09-27T10:30:00Z',
     type: 'parking',

@@ -5,6 +5,7 @@ import { ArrowLeft, CarFront, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { Car } from '#/api/client'
+import { AttachmentOverview } from '#/attachments/attachment-indicator'
 import { CarConsumption } from '#/cars/car-consumption'
 import { CarExpenses } from '#/cars/car-expenses'
 import { CarStatus } from '#/cars/car-status'
@@ -189,6 +190,8 @@ function CarDetails({ car }: { car: Car }) {
           <dd className="preserve-lines">{car.information ?? notRecorded}</dd>
         </div>
       </dl>
+
+      <AttachmentOverview owner={{ kind: 'cars', id: car.id }} />
 
       <div className="form-actions">
         <Link className="button button-secondary" to="/cars">

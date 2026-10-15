@@ -421,10 +421,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cars/{carId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                carId: components["parameters"]["CarId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listCarAttachments"];
+        put?: never;
+        post: operations["uploadCarAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/refuels/{refuelId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refuelId: components["parameters"]["RefuelId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listRefuelAttachments"];
+        put?: never;
+        post: operations["uploadRefuelAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repairs/{repairId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repairId: components["parameters"]["RepairId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listRepairAttachments"];
+        put?: never;
+        post: operations["uploadRepairAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticketId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: components["parameters"]["TicketId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listTicketAttachments"];
+        put?: never;
+        post: operations["uploadTicketAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAttachmentLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteAttachment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{attachmentId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Streams the stored file. The response carries
+         *     `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`,
+         *     `Cache-Control: private, no-store` and an inline
+         *     `Content-Disposition` with the original filename.
+         */
+        get: operations["downloadAttachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AttachmentContentType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf";
+        /** @description A file attached to a car, refuel, repair or ticket. Its contents are downloaded from `/attachments/{attachmentId}/content`. */
+        Attachment: {
+            id: components["schemas"]["UUID"];
+            /** @description Original file name without directories, for display. */
+            filename: string;
+            contentType: components["schemas"]["AttachmentContentType"];
+            /** @description Size in bytes. */
+            size: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AttachmentPage: {
+            items: components["schemas"]["Attachment"][];
+            nextCursor: null;
+        };
+        AttachmentUpload: {
+            /** @description The file. Its type is detected from its content; only JPEG, PNG, WebP and GIF images and PDF documents are accepted. */
+            file: string;
+        };
+        AttachmentLimits: {
+            /** @description Maximum size of one file in bytes (`MAX_UPLOAD_BYTES`). */
+            maxFileBytes: number;
+            /** @description Maximum number of attachments per entry. */
+            maxFilesPerEntry: number;
+            allowedContentTypes: components["schemas"]["AttachmentContentType"][];
+        };
         /** Format: uuid */
         UUID: string;
         Decimal: string;
@@ -557,6 +715,8 @@ export interface components {
         /** @description A car. Every member is always present; `firstRegistration`, `licensePlate`, `fin`, `purchaseDate`, `purchasePrice`, `deregistrationDate`, and `information` are `null` when not recorded. */
         Car: {
             id: components["schemas"]["UUID"];
+            /** @description Number of attachments of this entry. */
+            readonly attachmentCount: number;
             type: string;
             make: string;
             name: string;
@@ -609,6 +769,8 @@ export interface components {
         };
         Refuel: {
             id: components["schemas"]["UUID"];
+            /** @description Number of attachments of this entry. */
+            readonly attachmentCount: number;
             carId: components["schemas"]["UUID"];
             /** Format: date-time */
             date: string;
@@ -650,6 +812,8 @@ export interface components {
         /** @description A repair. Every member is always present; `odometerReading` is `null` and `description` is empty when not recorded. */
         Repair: {
             id: components["schemas"]["UUID"];
+            /** @description Number of attachments of this entry. */
+            readonly attachmentCount: number;
             carId: components["schemas"]["UUID"];
             /** Format: date-time */
             date: string;
@@ -686,6 +850,8 @@ export interface components {
         /** @description A ticket. Every member is always present; `description` is empty when not recorded. */
         Ticket: {
             id: components["schemas"]["UUID"];
+            /** @description Number of attachments of this entry. */
+            readonly attachmentCount: number;
             carId: components["schemas"]["UUID"];
             /** Format: date-time */
             date: string;
@@ -765,6 +931,33 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description The entry already has the maximum number of attachments (10); the error code is `attachment_limit_reached`. */
+        AttachmentLimitReached: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The file exceeds the maximum upload size; the error code is `file_too_large`. */
+        FileTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The file content is not a JPEG, PNG, WebP or GIF image or a PDF document; the error code is `unsupported_media_type`. */
+        UnsupportedMediaType: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description The session is older than the fresh-login window (5 minutes); the error code is `reauthentication_required`. */
         ReauthenticationRequired: {
             headers: {
@@ -814,6 +1007,7 @@ export interface components {
         RefuelId: components["schemas"]["UUID"];
         RepairId: components["schemas"]["UUID"];
         TicketId: components["schemas"]["UUID"];
+        AttachmentId: components["schemas"]["UUID"];
         CarFilter: components["schemas"]["UUID"];
         From: string;
         To: string;
@@ -1635,6 +1829,314 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    listCarAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                carId: components["parameters"]["CarId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All attachments of the car (at most 10), ordered by upload time then ID; `nextCursor` is always `null`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    uploadCarAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                carId: components["parameters"]["CarId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AttachmentUpload"];
+            };
+        };
+        responses: {
+            /** @description Stored attachment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AttachmentLimitReached"];
+            413: components["responses"]["FileTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    listRefuelAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refuelId: components["parameters"]["RefuelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All attachments of the refuel (at most 10), ordered by upload time then ID; `nextCursor` is always `null`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    uploadRefuelAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refuelId: components["parameters"]["RefuelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AttachmentUpload"];
+            };
+        };
+        responses: {
+            /** @description Stored attachment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AttachmentLimitReached"];
+            413: components["responses"]["FileTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    listRepairAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repairId: components["parameters"]["RepairId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All attachments of the repair (at most 10), ordered by upload time then ID; `nextCursor` is always `null`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    uploadRepairAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repairId: components["parameters"]["RepairId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AttachmentUpload"];
+            };
+        };
+        responses: {
+            /** @description Stored attachment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AttachmentLimitReached"];
+            413: components["responses"]["FileTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    listTicketAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: components["parameters"]["TicketId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All attachments of the ticket (at most 10), ordered by upload time then ID; `nextCursor` is always `null`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    uploadTicketAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: components["parameters"]["TicketId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AttachmentUpload"];
+            };
+        };
+        responses: {
+            /** @description Stored attachment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AttachmentLimitReached"];
+            413: components["responses"]["FileTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    getAttachmentLimits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload limits enforced by the server. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    deleteAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attachment and its stored file deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["ServerError"];
+        };
+    };
+    downloadAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file contents, with the attachment's content type. */
+            200: {
+                headers: {
+                    /** @description `inline` with the original filename (RFC 6266). */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                    "image/gif": string;
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             default: components["responses"]["ServerError"];
         };
     };

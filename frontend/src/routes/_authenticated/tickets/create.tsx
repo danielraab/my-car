@@ -3,7 +3,11 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ReceiptText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { createTicket } from '#/api/client'
+import { createTicket, type TicketInput } from '#/api/client'
+import {
+  AttachmentQueue,
+  useAttachmentQueue,
+} from '#/attachments/attachment-queue'
 import { isDeregistered } from '#/cars/deregistration'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { CarsStatus } from '#/repairs/cars-status'
@@ -23,10 +27,27 @@ function CreateTicketPage() {
   const navigate = useNavigate()
   const cars = useQuery(allCarsQueryOptions)
   const locations = useQuery(ticketLocationsQueryOptions)
+  const queue = useAttachmentQueue()
   const create = useMutation({
-    mutationFn: createTicket,
-    onSuccess: () => {
+    // Queued files are uploaded once the ticket exists; ones that fail are
+    // reported on its edit screen, since the ticket itself is saved.
+    mutationFn: async (input: TicketInput) => {
+      const ticket = await createTicket(input)
+      return {
+        ticket,
+        failed: await queue.upload({ kind: 'tickets', id: ticket.id }),
+      }
+    },
+    onSuccess: ({ ticket, failed }) => {
       queryClient.removeQueries({ queryKey: ticketsQueryKey })
+      if (failed.length > 0) {
+        void navigate({
+          to: '/tickets/$ticketId/edit',
+          params: { ticketId: ticket.id },
+          state: { failedUploads: failed },
+        })
+        return
+      }
       void navigate({ to: '/tickets' })
     },
   })
@@ -60,6 +81,9 @@ function CreateTicketPage() {
           pending={create.isPending}
           error={create.error}
           onSubmit={(input) => create.mutate(input)}
+          attachments={
+            <AttachmentQueue queue={queue} disabled={create.isPending} />
+          }
           onEdit={() => {
             if (create.isError) create.reset()
           }}

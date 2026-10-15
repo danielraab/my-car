@@ -26,6 +26,7 @@ type Refuel struct {
 	Fuel            string
 	Liters          string
 	Amount          string
+	AttachmentCount int
 }
 
 // Input is a validated refuel creation request.
@@ -90,7 +91,7 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, car_id, date, station, odometer_reading, fuel::text, liters::text, amount::text`
+const columns = `id, car_id, date, station, odometer_reading, fuel::text, liters::text, amount::text, (SELECT count(*) FROM attachments a WHERE a.refuel_id = refuels.id)`
 
 // owned restricts refuels to those on the account in $1's cars; refuels
 // have no account column of their own.
@@ -98,7 +99,7 @@ const owned = `car_id IN (SELECT id FROM cars WHERE account_id = $1)`
 
 func scanRefuel(row pgx.Row) (Refuel, error) {
 	var r Refuel
-	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Fuel, &r.Liters, &r.Amount)
+	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Fuel, &r.Liters, &r.Amount, &r.AttachmentCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Refuel{}, ErrNotFound
 	}

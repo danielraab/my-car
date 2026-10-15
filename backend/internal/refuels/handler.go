@@ -93,13 +93,14 @@ type refuelBody struct {
 	PerLiter        string  `json:"perLiter"`
 	Distance        *int64  `json:"distance"`
 	Consumption     *string `json:"consumption"`
+	AttachmentCount int     `json:"attachmentCount"`
 }
 
 func toBody(r Refuel) refuelBody {
 	return refuelBody{
 		ID: r.ID, CarID: r.CarID, Date: r.Date.UTC().Format(time.RFC3339Nano), Station: r.Station,
 		OdometerReading: r.OdometerReading, Fuel: r.Fuel, Liters: r.Liters, Amount: r.Amount,
-		PerLiter: ratio(r.Amount, r.Liters, 3),
+		PerLiter: ratio(r.Amount, r.Liters, 3), AttachmentCount: r.AttachmentCount,
 	}
 }
 

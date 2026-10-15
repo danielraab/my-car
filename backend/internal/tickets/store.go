@@ -18,13 +18,14 @@ var ErrNotFound = errors.New("ticket not found")
 // Ticket is a stored ticket. The amount is a decimal string exactly as it
 // appears on the wire; an unrecorded description is empty.
 type Ticket struct {
-	ID          string
-	CarID       string
-	Date        time.Time
-	Type        string
-	Location    string
-	Amount      string
-	Description string
+	ID              string
+	CarID           string
+	Date            time.Time
+	Type            string
+	Location        string
+	Amount          string
+	Description     string
+	AttachmentCount int
 }
 
 // Input is a validated ticket creation request.
@@ -80,7 +81,7 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, car_id, date, type::text, location, amount::text, COALESCE(description, '')`
+const columns = `id, car_id, date, type::text, location, amount::text, COALESCE(description, ''), (SELECT count(*) FROM attachments a WHERE a.ticket_id = tickets.id)`
 
 // owned restricts tickets to those on the account in $1's cars; tickets
 // have no account column of their own.
@@ -88,7 +89,7 @@ const owned = `car_id IN (SELECT id FROM cars WHERE account_id = $1)`
 
 func scanTicket(row pgx.Row) (Ticket, error) {
 	var t Ticket
-	err := row.Scan(&t.ID, &t.CarID, &t.Date, &t.Type, &t.Location, &t.Amount, &t.Description)
+	err := row.Scan(&t.ID, &t.CarID, &t.Date, &t.Type, &t.Location, &t.Amount, &t.Description, &t.AttachmentCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Ticket{}, ErrNotFound
 	}

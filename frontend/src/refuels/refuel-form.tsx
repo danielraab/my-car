@@ -83,6 +83,8 @@ type RefuelFormProps = {
   onSubmit: (input: RefuelInput) => void
   onEdit: () => void
   secondaryAction?: ReactNode
+  // Rendered after the fields, such as the attachment queue of a create form.
+  attachments?: ReactNode
 }
 
 export function RefuelForm({
@@ -97,6 +99,7 @@ export function RefuelForm({
   onSubmit,
   onEdit,
   secondaryAction,
+  attachments,
 }: RefuelFormProps) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() =>
@@ -296,6 +299,8 @@ export function RefuelForm({
           { hint: true },
         )}
       </div>
+
+      {attachments}
 
       {formError ? (
         <p className="field-error" role="alert">

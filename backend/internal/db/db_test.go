@@ -69,8 +69,8 @@ func TestRunMigrations(t *testing.T) {
 	if err := sqlDB.QueryRow("SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("query schema_migrations: %v", err)
 	}
-	if version != 7 {
-		t.Errorf("schema_migrations.version = %d, want 7", version)
+	if version != 8 {
+		t.Errorf("schema_migrations.version = %d, want 8", version)
 	}
 	if dirty {
 		t.Errorf("schema_migrations.dirty = true, want false")
@@ -101,11 +101,11 @@ func TestDomainSchema(t *testing.T) {
 		_ = lock.Close()
 	}()
 
-	if _, err := sqlDB.Exec("TRUNCATE accounts CASCADE"); err != nil {
+	if _, err := sqlDB.Exec("TRUNCATE accounts, attachment_file_deletions CASCADE"); err != nil {
 		t.Fatalf("truncate domain tables: %v", err)
 	}
 	defer func() {
-		if _, err := sqlDB.Exec("TRUNCATE accounts CASCADE"); err != nil {
+		if _, err := sqlDB.Exec("TRUNCATE accounts, attachment_file_deletions CASCADE"); err != nil {
 			t.Errorf("cleanup domain tables: %v", err)
 		}
 	}()
@@ -125,12 +125,13 @@ func TestDomainSchema(t *testing.T) {
 
 	assertNullableOdometerAndNumericChecks(t, sqlDB, carID)
 	assertUpdatedAtTrigger(t, sqlDB, carID)
+	assertAttachments(t, sqlDB, accountID, carID)
 	assertCarDeleteCascades(t, sqlDB, carID)
 }
 
 func assertSchemaObjects(t *testing.T, sqlDB *sql.DB) {
 	t.Helper()
-	for _, table := range []string{"accounts", "cars", "refuels", "repairs", "tickets", "oidc_identities", "oidc_login_attempts", "magic_link_challenges", "sessions", "webauthn_credentials", "webauthn_challenges"} {
+	for _, table := range []string{"accounts", "cars", "refuels", "repairs", "tickets", "oidc_identities", "oidc_login_attempts", "magic_link_challenges", "sessions", "webauthn_credentials", "webauthn_challenges", "attachments", "attachment_file_deletions"} {
 		var exists bool
 		if err := sqlDB.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1)", table).Scan(&exists); err != nil {
 			t.Fatalf("check %s table: %v", table, err)
@@ -150,7 +151,7 @@ func assertSchemaObjects(t *testing.T, sqlDB *sql.DB) {
 		}
 	}
 
-	for _, index := range []string{"cars_account_created_at_id_idx", "refuels_car_date_id_idx", "repairs_car_date_id_idx", "tickets_car_date_id_idx", "oidc_login_attempts_expiry_idx", "magic_link_challenges_expiry_idx", "sessions_account_expiry_idx", "sessions_expiry_idx", "webauthn_credentials_account_created_at_id_idx", "webauthn_challenges_expiry_idx", "sessions_credential_idx"} {
+	for _, index := range []string{"cars_account_created_at_id_idx", "refuels_car_date_id_idx", "repairs_car_date_id_idx", "tickets_car_date_id_idx", "oidc_login_attempts_expiry_idx", "magic_link_challenges_expiry_idx", "sessions_account_expiry_idx", "sessions_expiry_idx", "webauthn_credentials_account_created_at_id_idx", "webauthn_challenges_expiry_idx", "sessions_credential_idx", "attachments_car_idx", "attachments_refuel_idx", "attachments_repair_idx", "attachments_ticket_idx"} {
 		var exists bool
 		if err := sqlDB.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1)", index).Scan(&exists); err != nil {
 			t.Fatalf("check %s index: %v", index, err)
@@ -310,6 +311,50 @@ func assertCarDeleteCascades(t *testing.T, sqlDB *sql.DB, carID string) {
 		if count != 0 {
 			t.Errorf("%s has %d rows after car deletion, want 0", table, count)
 		}
+	}
+	assertQueued(t, sqlDB, "k-car", true)
+	assertQueued(t, sqlDB, "k-refuel", true)
+}
+
+// assertAttachments checks the exactly-one-owner rule and that deleting an
+// attachment, directly or through a cascade from its car's expense, queues
+// its stored file for removal. It leaves one attachment on carID and one on
+// a refuel of carID for assertCarDeleteCascades.
+func assertAttachments(t *testing.T, sqlDB *sql.DB, accountID, carID string) {
+	t.Helper()
+	var refuelID, ticketID string
+	if err := sqlDB.QueryRow("INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'Station', 'normal', 10, 20) RETURNING id", carID).Scan(&refuelID); err != nil {
+		t.Fatalf("insert refuel: %v", err)
+	}
+	if err := sqlDB.QueryRow("INSERT INTO tickets (car_id, date, type, location, amount) VALUES ($1, now(), 'parking', 'Linz', 5) RETURNING id", carID).Scan(&ticketID); err != nil {
+		t.Fatalf("insert ticket: %v", err)
+	}
+	insert := "INSERT INTO attachments (id, account_id, car_id, refuel_id, ticket_id, storage_key, filename, content_type, size_bytes) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'receipt.jpg', $6, 10)"
+	assertRejected(t, sqlDB, insert, accountID, nil, nil, nil, "k-none", "image/jpeg")
+	assertRejected(t, sqlDB, insert, accountID, nil, refuelID, ticketID, "k-two", "image/jpeg")
+	assertRejected(t, sqlDB, insert, accountID, carID, nil, nil, "k-svg", "image/svg+xml")
+	for key, owner := range map[string][3]any{"k-car": {carID, nil, nil}, "k-refuel": {nil, refuelID, nil}, "k-ticket": {nil, nil, ticketID}} {
+		if _, err := sqlDB.Exec(insert, accountID, owner[0], owner[1], owner[2], key, "image/jpeg"); err != nil {
+			t.Fatalf("insert attachment %s: %v", key, err)
+		}
+	}
+	assertRejected(t, sqlDB, insert, accountID, carID, nil, nil, "k-car", "image/jpeg")
+
+	if _, err := sqlDB.Exec("DELETE FROM tickets WHERE id = $1", ticketID); err != nil {
+		t.Fatalf("delete ticket: %v", err)
+	}
+	assertQueued(t, sqlDB, "k-ticket", true)
+	assertQueued(t, sqlDB, "k-car", false)
+}
+
+func assertQueued(t *testing.T, sqlDB *sql.DB, key string, want bool) {
+	t.Helper()
+	var queued bool
+	if err := sqlDB.QueryRow("SELECT EXISTS (SELECT 1 FROM attachment_file_deletions WHERE storage_key = $1)", key).Scan(&queued); err != nil {
+		t.Fatalf("check file deletion queue: %v", err)
+	}
+	if queued != want {
+		t.Errorf("storage key %s queued for deletion = %v, want %v", key, queued, want)
 	}
 }
 

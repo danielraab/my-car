@@ -128,6 +128,8 @@ type CarFormProps = {
   onSubmit: (input: CarInput) => void
   onEdit: () => void
   secondaryAction?: ReactNode
+  // Rendered after the fields, such as the attachment queue of a create form.
+  attachments?: ReactNode
 }
 
 export function CarForm({
@@ -139,6 +141,7 @@ export function CarForm({
   onSubmit,
   onEdit,
   secondaryAction,
+  attachments,
 }: CarFormProps) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() => initialValues(car))
@@ -281,6 +284,8 @@ export function CarForm({
           )
         })}
       </div>
+
+      {attachments}
 
       {formError ? (
         <p className="field-error" role="alert">

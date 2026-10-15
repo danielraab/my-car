@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { Car, Refuel } from '#/api/client'
+import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
 import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
@@ -57,6 +58,9 @@ export function RefuelTable({
             </th>
             <th scope="col" className="numeric">
               {t('refuels.fields.consumption')}
+            </th>
+            <th scope="col">
+              <span className="sr-only">{t('attachments.title')}</span>
             </th>
           </tr>
         </thead>
@@ -115,6 +119,12 @@ export function RefuelTable({
                         value: formatNumber(consumption, locale, 2),
                       })}
                 </td>
+                <td className="attachment-cell">
+                  <AttachmentIndicator
+                    owner={{ kind: 'refuels', id: refuel.id }}
+                    count={refuel.attachmentCount}
+                  />
+                </td>
               </tr>
             )
           })}
@@ -124,6 +134,7 @@ export function RefuelTable({
             <tr>
               <td colSpan={showCar ? 7 : 6}>{t('refuels.total')}</td>
               <td className="numeric">{formatAmount(String(total), locale)}</td>
+              <td />
               <td />
             </tr>
           </tfoot>

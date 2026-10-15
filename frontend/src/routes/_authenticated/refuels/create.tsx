@@ -3,7 +3,11 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Fuel } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { createRefuel } from '#/api/client'
+import { createRefuel, type RefuelInput } from '#/api/client'
+import {
+  AttachmentQueue,
+  useAttachmentQueue,
+} from '#/attachments/attachment-queue'
 import { isDeregistered } from '#/cars/deregistration'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { refuelStationsQueryOptions, refuelsQueryKey } from '#/refuels/queries'
@@ -23,10 +27,27 @@ function CreateRefuelPage() {
   const navigate = useNavigate()
   const cars = useQuery(allCarsQueryOptions)
   const stations = useQuery(refuelStationsQueryOptions)
+  const queue = useAttachmentQueue()
   const create = useMutation({
-    mutationFn: createRefuel,
-    onSuccess: () => {
+    // Queued files are uploaded once the refuel exists; ones that fail are
+    // reported on its edit screen, since the refuel itself is saved.
+    mutationFn: async (input: RefuelInput) => {
+      const refuel = await createRefuel(input)
+      return {
+        refuel,
+        failed: await queue.upload({ kind: 'refuels', id: refuel.id }),
+      }
+    },
+    onSuccess: ({ refuel, failed }) => {
       queryClient.removeQueries({ queryKey: refuelsQueryKey })
+      if (failed.length > 0) {
+        void navigate({
+          to: '/refuels/$refuelId/edit',
+          params: { refuelId: refuel.id },
+          state: { failedUploads: failed },
+        })
+        return
+      }
       void navigate({ to: '/refuels' })
     },
   })
@@ -60,6 +81,9 @@ function CreateRefuelPage() {
           pending={create.isPending}
           error={create.error}
           onSubmit={(input) => create.mutate(input)}
+          attachments={
+            <AttachmentQueue queue={queue} disabled={create.isPending} />
+          }
           onEdit={() => {
             if (create.isError) create.reset()
           }}

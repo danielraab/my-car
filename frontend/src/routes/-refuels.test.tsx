@@ -14,6 +14,7 @@ const profile = {
 }
 const car: Car = {
   id: '22222222-2222-2222-2222-222222222222',
+  attachmentCount: 0,
   type: 'Car',
   make: 'VW',
   name: 'Golf',
@@ -31,6 +32,7 @@ const car: Car = {
 }
 const refuel: Refuel = {
   id: '33333333-3333-3333-3333-333333333333',
+  attachmentCount: 0,
   carId: car.id,
   date: '2026-01-02T10:00:00Z',
   station: 'Fuel',
@@ -41,6 +43,13 @@ const refuel: Refuel = {
   perLiter: '1.5',
   distance: null,
   consumption: null,
+}
+const receipt = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  filename: 'receipt.jpg',
+  contentType: 'image/jpeg',
+  size: 2048,
+  createdAt: '2026-01-02T10:05:00Z',
 }
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -77,6 +86,21 @@ function backend(refuels: Refuel[] = [refuel], cars: Car[] = [car]) {
       if (call.startsWith('DELETE /api/v1/refuels/'))
         return new Response(null, { status: 204 })
       if (path === `/api/v1/refuels/${refuel.id}`) return response(refuel)
+      if (path === '/api/v1/attachments/limits')
+        return response({
+          maxFileBytes: 10485760,
+          maxFilesPerEntry: 10,
+          allowedContentTypes: ['image/jpeg', 'application/pdf'],
+        })
+      if (path === `/api/v1/refuels/${refuel.id}/attachments`) {
+        if (init?.method === 'POST') {
+          const file = (init.body as FormData).get('file') as File
+          return file.name.startsWith('broken')
+            ? response({ code: 'internal_error', message: 'boom' }, 500)
+            : response({ ...receipt, filename: file.name }, 201)
+        }
+        return response({ items: [receipt], nextCursor: null })
+      }
       if (path.startsWith('/api/v1/refuels'))
         return response({ items: refuels, nextCursor: null })
       throw new Error(path)
@@ -304,5 +328,94 @@ describe('refuels of inactive and deregistered cars', () => {
     renderApp(`/refuels/create?carId=${sold.id}`)
 
     expect(await screen.findByLabelText('Car')).toHaveValue('')
+  })
+})
+
+describe('refuel attachments', () => {
+  async function fillRefuel(user: ReturnType<typeof userEvent.setup>) {
+    await user.selectOptions(await screen.findByLabelText('Car'), car.id)
+    await user.type(screen.getByLabelText('Station'), 'Fuel')
+    await user.type(screen.getByLabelText('Litres'), '40')
+    await user.type(screen.getByLabelText('Amount'), '60')
+  }
+  const pdf = (name: string) =>
+    new File(['%PDF'], name, { type: 'application/pdf' })
+
+  it('uploads queued files after creating the refuel', async () => {
+    const calls = backend()
+    const user = userEvent.setup()
+    renderApp('/refuels/create')
+    await fillRefuel(user)
+    await user.upload(await screen.findByLabelText('Add files'), [
+      pdf('receipt.pdf'),
+    ])
+    expect(await screen.findByText('receipt.pdf')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add refuel' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Refuels' }),
+    ).toBeInTheDocument()
+    const posts = calls.filter((call) => call.startsWith('POST'))
+    expect(posts).toEqual([
+      'POST /api/v1/refuels',
+      `POST /api/v1/refuels/${refuel.id}/attachments`,
+    ])
+  })
+
+  it('opens the edit screen naming files that failed to upload', async () => {
+    backend()
+    const user = userEvent.setup()
+    renderApp('/refuels/create')
+    await fillRefuel(user)
+    await user.upload(await screen.findByLabelText('Add files'), [
+      pdf('broken.pdf'),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Add refuel' }))
+
+    expect(
+      await screen.findByText(
+        'The entry was saved, but these files could not be uploaded: broken.pdf. You can add them again here.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Edit refuel' }),
+    ).toBeInTheDocument()
+    expect(
+      within(
+        await screen.findByRole('list', { name: 'Attached files' }),
+      ).getByRole('link', { name: 'receipt.jpg' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a clickable paperclip on rows with attachments', async () => {
+    backend([{ ...refuel, attachmentCount: 1 }])
+    const user = userEvent.setup()
+    renderApp('/refuels')
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    await user.click(
+      within(table).getByRole('button', { name: '1 attachment' }),
+    )
+    expect(
+      await screen.findByRole('link', { name: 'receipt.jpg' }),
+    ).toHaveAttribute('href', `/api/v1/attachments/${receipt.id}/content`)
+  })
+
+  it('shows no paperclip on rows without attachments', async () => {
+    backend()
+    renderApp('/refuels')
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    expect(
+      within(table).queryByRole('button', { name: /attachment/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('explains the downscaling in German', async () => {
+    backend()
+    await i18n.changeLanguage('de')
+    renderApp('/refuels/create')
+    expect(
+      await screen.findByText(/werden vor dem Hochladen verkleinert/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Anhänge')).toBeInTheDocument()
   })
 })

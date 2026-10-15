@@ -21,6 +21,9 @@ COPY openapi/openapi.yaml ./openapi.yaml
 RUN rm -rf static/out && mkdir -p static/out
 COPY --from=frontend /src/frontend/out/. static/out/
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server .
+# Local attachment storage; copied with the runtime user's ownership so a
+# volume mounted there inherits it.
+RUN mkdir -p /out/data/files
 
 # ---- final: minimal non-root runtime ----
 FROM gcr.io/distroless/static-debian12:nonroot AS final
@@ -29,6 +32,9 @@ ARG REVISION=unknown
 LABEL org.opencontainers.image.version=$VERSION \
       org.opencontainers.image.revision=$REVISION
 COPY --from=backend /out/server /app/server
+COPY --from=backend --chown=65532:65532 /out/data /data
+# Mount a volume here, or uploaded files are lost with the container.
+ENV FILE_STORAGE_PATH=/data/files
 # distroless ships no shell; borrow the static busybox binary as /bin/sh so
 # tools that shell out (e.g. `docker exec ... sh -c`) still work. The server
 # itself never needs it: healthchecks call the binary directly, below.

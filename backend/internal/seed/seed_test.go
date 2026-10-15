@@ -32,8 +32,8 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Exec(ctx, "SELECT pg_advisory_unlock(7242026)")
-	defer pool.Exec(ctx, "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, refuels, repairs, tickets, cars, accounts")
-	if _, err := pool.Exec(ctx, "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, refuels, repairs, tickets, cars, accounts"); err != nil {
+	defer pool.Exec(ctx, "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, attachments, attachment_file_deletions, refuels, repairs, tickets, cars, accounts")
+	if _, err := pool.Exec(ctx, "TRUNCATE TABLE sessions, webauthn_challenges, webauthn_credentials, oidc_identities, oidc_login_attempts, magic_link_challenges, attachments, attachment_file_deletions, refuels, repairs, tickets, cars, accounts"); err != nil {
 		t.Fatal(err)
 	}
 	var oldID string
@@ -46,11 +46,14 @@ func TestRun(t *testing.T) {
 	if _, err := pool.Exec(ctx, "INSERT INTO webauthn_credentials (credential_id, account_id, public_key, user_verified, backup_eligible, backup_state, name) VALUES ('\\x01', $1, '\\x01', true, false, false, 'Old key')", oldID); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := pool.Exec(ctx, "WITH car AS (INSERT INTO cars (account_id, type, make, name, fuel) VALUES ($1, 'Car', 'VW', 'Golf', 'diesel') RETURNING id) INSERT INTO attachments (id, account_id, car_id, storage_key, filename, content_type, size_bytes) SELECT gen_random_uuid(), $1, id, 'old-key', 'old.pdf', 'application/pdf', 1 FROM car", oldID); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now().UTC()
 	if err := Run(ctx, pool, []string{"one@example.org", "two@example.org"}, now); err != nil {
 		t.Fatal(err)
 	}
-	for table, want := range map[string]int{"accounts": 2, "cars": 8, "refuels": 1000, "repairs": 150, "tickets": 180, "sessions": 0, "oidc_identities": 0, "oidc_login_attempts": 0, "magic_link_challenges": 0, "webauthn_credentials": 0, "webauthn_challenges": 0} {
+	for table, want := range map[string]int{"accounts": 2, "cars": 8, "refuels": 1000, "repairs": 150, "tickets": 180, "sessions": 0, "oidc_identities": 0, "oidc_login_attempts": 0, "magic_link_challenges": 0, "webauthn_credentials": 0, "webauthn_challenges": 0, "attachments": 0, "attachment_file_deletions": 1} {
 		var count int
 		if err := pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil || count != want {
 			t.Errorf("%s count = %d, error %v; want %d", table, count, err, want)

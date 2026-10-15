@@ -44,6 +44,21 @@ export type RefuelUpdate = components['schemas']['RefuelUpdate']
 export type RefuelPage = components['schemas']['RefuelPage']
 export type RefuelChart = components['schemas']['RefuelChart']
 export type RefuelFuel = Refuel['fuel']
+export type Attachment = components['schemas']['Attachment']
+export type AttachmentContentType = Attachment['contentType']
+export type AttachmentLimits = components['schemas']['AttachmentLimits']
+// The entry an attachment belongs to, named by its collection.
+export type AttachmentOwner = {
+  kind: 'cars' | 'refuels' | 'repairs' | 'tickets'
+  id: string
+}
+export const attachmentContentTypes: readonly AttachmentContentType[] = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+]
 export type ExpenseStatistics = components['schemas']['ExpenseStatistics']
 export type ExpenseRow = ExpenseStatistics['items'][number]
 export type ExpenseKind = ExpenseRow['kind']
@@ -109,6 +124,10 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string'
 }
 
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 function isCar(value: unknown): value is Car {
   if (!isRecord(value)) return false
   const required = [
@@ -123,6 +142,7 @@ function isCar(value: unknown): value is Car {
     required.every((field) => typeof field === 'string') &&
     carFuels.some((fuel) => fuel === value.fuel) &&
     typeof value.isActive === 'boolean' &&
+    isCount(value.attachmentCount) &&
     [
       value.firstRegistration,
       value.licensePlate,
@@ -157,6 +177,7 @@ function isRepair(value: unknown): value is Repair {
       value.description,
     ].every((field) => typeof field === 'string') &&
     repairTypes.some((type) => type === value.type) &&
+    isCount(value.attachmentCount) &&
     (odometerReading === null ||
       (typeof odometerReading === 'number' &&
         Number.isInteger(odometerReading)))
@@ -183,7 +204,8 @@ function isTicket(value: unknown): value is Ticket {
       value.amount,
       value.description,
     ].every((field) => typeof field === 'string') &&
-    ticketTypes.some((type) => type === value.type)
+    ticketTypes.some((type) => type === value.type) &&
+    isCount(value.attachmentCount)
   )
 }
 
@@ -211,6 +233,7 @@ function isRefuel(value: unknown): value is Refuel {
       value.perLiter,
     ].every((v) => typeof v === 'string') &&
     refuelFuels.some((fuel) => fuel === value.fuel) &&
+    isCount(value.attachmentCount) &&
     nullableNumber(value.odometerReading) &&
     nullableNumber(value.distance) &&
     isNullableString(value.consumption)
@@ -242,6 +265,37 @@ function isExpenseStatistics(value: unknown): value is ExpenseStatistics {
         typeof item.date === 'string' &&
         typeof item.amount === 'string' &&
         expenseKinds.some((kind) => kind === item.kind),
+    )
+  )
+}
+
+function isAttachment(value: unknown): value is Attachment {
+  return (
+    isRecord(value) &&
+    [value.id, value.filename, value.createdAt].every(
+      (field) => typeof field === 'string',
+    ) &&
+    attachmentContentTypes.some((type) => type === value.contentType) &&
+    isCount(value.size)
+  )
+}
+
+function isAttachmentList(value: unknown): value is { items: Attachment[] } {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.every(isAttachment)
+  )
+}
+
+function isAttachmentLimits(value: unknown): value is AttachmentLimits {
+  return (
+    isRecord(value) &&
+    isCount(value.maxFileBytes) &&
+    isCount(value.maxFilesPerEntry) &&
+    Array.isArray(value.allowedContentTypes) &&
+    value.allowedContentTypes.every((type) =>
+      attachmentContentTypes.includes(type),
     )
   )
 }
@@ -677,6 +731,58 @@ export async function deleteRefuel(id: string): Promise<void> {
       'invalid_response',
       'The server response is invalid',
     )
+}
+
+function attachmentsPath(owner: AttachmentOwner): string {
+  return `/api/v1/${owner.kind}/${encodeURIComponent(owner.id)}/attachments`
+}
+
+function attachmentPath(attachmentId: string): string {
+  return `/api/v1/attachments/${encodeURIComponent(attachmentId)}`
+}
+
+// Where the browser opens an attachment; the session cookie authorizes it.
+export function attachmentContentUrl(attachmentId: string): string {
+  return `${attachmentPath(attachmentId)}/content`
+}
+
+export async function getAttachments(
+  owner: AttachmentOwner,
+): Promise<Attachment[]> {
+  return (
+    await decoded(await fetchApi(attachmentsPath(owner)), isAttachmentList)
+  ).items
+}
+
+// Uploads one file. A rejection carries the server's code, such as
+// unsupported_media_type (415), file_too_large (413) or
+// attachment_limit_reached (409).
+export async function uploadAttachment(
+  owner: AttachmentOwner,
+  file: File,
+): Promise<Attachment> {
+  const body = new FormData()
+  body.append('file', file, file.name)
+  const response = await fetchApi(attachmentsPath(owner), {
+    method: 'POST',
+    body,
+  })
+  return decoded(response, isAttachment)
+}
+
+export async function deleteAttachment(attachmentId: string): Promise<void> {
+  const response = await fetchApi(attachmentPath(attachmentId), {
+    method: 'DELETE',
+  })
+  if (response.status === 401) throw new UnauthorizedError()
+  await expectNoContent(response)
+}
+
+export async function getAttachmentLimits(): Promise<AttachmentLimits> {
+  return decoded(
+    await fetchApi('/api/v1/attachments/limits'),
+    isAttachmentLimits,
+  )
 }
 
 export async function requestMagicLink(input: MagicLinkRequest): Promise<void> {

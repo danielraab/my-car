@@ -26,6 +26,7 @@ type Repair struct {
 	Type            string
 	Amount          string
 	Description     string
+	AttachmentCount int
 }
 
 // Input is a validated repair creation request.
@@ -90,7 +91,7 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, car_id, date, station, odometer_reading, type::text, amount::text, COALESCE(description, '')`
+const columns = `id, car_id, date, station, odometer_reading, type::text, amount::text, COALESCE(description, ''), (SELECT count(*) FROM attachments a WHERE a.repair_id = repairs.id)`
 
 // owned restricts repairs to those on the account in $1's cars; repairs
 // have no account column of their own.
@@ -98,7 +99,7 @@ const owned = `car_id IN (SELECT id FROM cars WHERE account_id = $1)`
 
 func scanRepair(row pgx.Row) (Repair, error) {
 	var r Repair
-	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Type, &r.Amount, &r.Description)
+	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Type, &r.Amount, &r.Description, &r.AttachmentCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Repair{}, ErrNotFound
 	}

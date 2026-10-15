@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { Car, Repair } from '#/api/client'
+import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
 import { carLabel, formatAmount } from '#/cars/format'
 import { formatDateTime } from '#/repairs/format'
@@ -37,6 +38,9 @@ export function RepairTable({
             <th scope="col">{t('repairs.fields.type')}</th>
             <th scope="col" className="numeric">
               {t('repairs.fields.amount')}
+            </th>
+            <th scope="col">
+              <span className="sr-only">{t('attachments.title')}</span>
             </th>
           </tr>
         </thead>
@@ -76,6 +80,12 @@ export function RepairTable({
               </td>
               <td>{t(`repairs.types.${repair.type}`)}</td>
               <td className="numeric">{formatAmount(repair.amount, locale)}</td>
+              <td className="attachment-cell">
+                <AttachmentIndicator
+                  owner={{ kind: 'repairs', id: repair.id }}
+                  count={repair.attachmentCount}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -84,6 +94,7 @@ export function RepairTable({
             <tr>
               <td colSpan={showCar ? 5 : 4}>{t('repairs.total')}</td>
               <td className="numeric">{formatAmount(String(total), locale)}</td>
+              <td />
             </tr>
           </tfoot>
         )}
