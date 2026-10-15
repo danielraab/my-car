@@ -143,6 +143,11 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err er
 	switch {
 	case errors.Is(err, ErrNotFound):
 		apierror.NotFound(w)
+	case errors.Is(err, ErrBlobNotFound):
+		// The record exists but its content is gone; the caller can do
+		// nothing about it, but an operator should know.
+		httpserver.Logger(r.Context()).Warn("attachment content missing", "op", op, "error", err)
+		apierror.NotFound(w)
 	case errors.Is(err, ErrLimitReached):
 		apierror.Write(w, http.StatusConflict, CodeAttachmentLimitReached, "the entry already has the maximum number of attachments", nil)
 	default:

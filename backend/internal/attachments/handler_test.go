@@ -404,6 +404,20 @@ func TestDownloadServesProtectiveHeaders(t *testing.T) {
 	}
 }
 
+func TestDownloadMissingContentIsNotFound(t *testing.T) {
+	e := newEnv(t, 1<<20, sessionFor(callerID))
+	rec := e.do(uploadRequest(t, refuelAttachments, "file", "receipt.jpg", "image/jpeg", jpegBytes))
+	id := decodeMap(t, rec)["id"].(string)
+	e.blobs.mu.Lock()
+	clear(e.blobs.files)
+	e.blobs.mu.Unlock()
+
+	rec = e.do(httptest.NewRequest(http.MethodGet, "/api/v1/attachments/"+id+"/content", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestListAndDelete(t *testing.T) {
 	e := newEnv(t, 1<<20, sessionFor(callerID))
 	rec := e.do(uploadRequest(t, refuelAttachments, "file", "r.pdf", "application/pdf", pdfBytes))
