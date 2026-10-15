@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/oauth2"
+
+	"at.draab/my-car/internal/httpserver"
 )
 
 // sessionLifetime is how long a browser session stays valid after login.
@@ -138,13 +139,13 @@ func (s *Service) requestMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = s.store.CreateMagicLink(r.Context(), digest, email, returnTo, s.now().Add(15*time.Minute)); err != nil {
-		log.Printf("create magic-link challenge: %v", err)
+		httpserver.Logger(r.Context()).Error("create magic-link challenge", "error", err)
 		writeError(w, 500, "authentication unavailable")
 		return
 	}
 	link := s.baseURL + "/api/v1/auth/magic-links/" + url.PathEscape(token)
 	if err = s.mailer.SendMagicLink(r.Context(), email, link); err != nil {
-		log.Printf("deliver magic-link email: %v", err)
+		httpserver.Logger(r.Context()).Error("deliver magic-link email", "error", err)
 		_ = s.store.DeleteMagicLink(r.Context(), digest)
 		writeError(w, 500, "authentication unavailable")
 		return
@@ -214,7 +215,7 @@ func (s *Service) callbackOIDC(w http.ResponseWriter, r *http.Request) {
 	}
 	identity, err := s.oidc.Verify(r.Context(), r.URL.Query().Get("code"), attempt.PKCEVerifier, attempt.Nonce)
 	if err != nil {
-		log.Printf("verify OIDC identity: %v", err)
+		httpserver.Logger(r.Context()).Warn("verify OIDC identity", "error", err)
 		writeError(w, 401, "identity could not be verified")
 		return
 	}

@@ -248,3 +248,33 @@ func TestMagicLinkRecipientLimitIsSilent(t *testing.T) {
 		}
 	}
 }
+
+func TestRateLimitLogOmitsURLSecrets(t *testing.T) {
+	for _, tc := range []struct {
+		name, target, route string
+		secrets             []string
+	}{
+		{"magic-link consumption", "/api/v1/auth/magic-links/s3cret-t0ken", "GET /api/v1/auth/magic-links/{token}", []string{"s3cret-t0ken"}},
+		{"OIDC callback", "/api/v1/auth/oidc/callback?code=s3cret-c0de&state=s3cret-st4te", "GET /api/v1/auth/oidc/callback", []string{"s3cret-c0de", "s3cret-st4te"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _, _, _ := newTestService()
+			for i := 0; i < 30; i++ {
+				serveFrom(s, "198.51.100.7:4000", "GET", "/api/v1/auth/oidc/start", "")
+			}
+			logs := captureLogs(t)
+			if w := serveFrom(s, "198.51.100.7:4000", "GET", tc.target, ""); w.Code != http.StatusSeeOther {
+				t.Fatalf("throttled request=%d", w.Code)
+			}
+			entry := logs.String()
+			if !strings.Contains(entry, "rate limit exceeded") || !strings.Contains(entry, tc.route) {
+				t.Fatalf("log=%q, want the route %q", entry, tc.route)
+			}
+			for _, secret := range tc.secrets {
+				if strings.Contains(entry, secret) {
+					t.Fatalf("log=%q contains %q", entry, secret)
+				}
+			}
+		})
+	}
+}

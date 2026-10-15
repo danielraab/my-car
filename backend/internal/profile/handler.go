@@ -5,13 +5,13 @@ package profile
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
+	"at.draab/my-car/internal/httpserver"
 )
 
 // MaxNameLength is the maximum length of a trimmed name, in characters.
@@ -72,7 +72,7 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := h.store.UpdateAccountNames(r.Context(), account.ID, firstName, lastName)
 	if err != nil {
-		log.Printf("update profile: %v", err)
+		httpserver.Logger(r.Context()).Error("update profile", "error", err)
 		apierror.Internal(w)
 		return
 	}

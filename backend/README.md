@@ -212,6 +212,36 @@ ANALYTICS_SNIPPET='<script defer src="https://umami.example/script.js" data-webs
 - The snippet is not validated. A malformed one breaks the page's `<head>`, and
   a future Content-Security-Policy would have to allow its sources.
 
+## Logging
+
+The backend logs plain `key=value` text to stderr. Two settings control it:
+
+- `LOG_LEVEL` (`debug | info | warn | error`, default `info`) is the minimum
+  level of all output. Access-log entries and rate-limit hits are `info`, so
+  `warn` or `error` hides them too.
+- `LOG_REQUESTS` (`all | errors | off`, default `all`) selects which requests
+  get an access-log entry: every request, only those answered with status
+  400 or higher (including 429 rate-limit refusals), or none.
+
+An access entry records the method, the route template, the status, the
+duration and the request ID:
+
+```text
+level=INFO msg=request request_id=3f9c0a1b2d4e5f60 method=GET route="GET /api/v1/cars/{carId}" status=200 duration=2.1ms
+```
+
+- API requests are identified only by their route template, never by their
+  concrete path, because a path can carry a secret such as the magic-link
+  token. Requests outside `/api/` (the frontend) also log their `path`.
+  Query strings, headers, cookies and bodies are never logged.
+- Every response carries an `X-Request-Id` header. Errors that a handler logs
+  while serving the request carry the same `request_id`, so a failed request
+  can be traced from the response to its log entries.
+- A panicking handler is logged at `error` with its request ID and answered
+  with `500`; the server keeps running.
+- Docker's healthcheck hits `/api/healthz` regularly, so with `all` it adds
+  one line per interval. Use `errors` to keep only problems.
+
 ## Conventions
 
 Non-trivial changes go through the OpenSpec `explore → propose → apply`

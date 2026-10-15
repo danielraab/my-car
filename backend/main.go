@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/mail"
 	"os"
@@ -41,7 +41,7 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "seed" {
 		if err := runSeed(os.Args[2:]); err != nil {
-			log.Fatalf("seed: %v", err)
+			fatal("seed", err)
 		}
 		return
 	}
@@ -171,7 +171,7 @@ func runSeed(args []string) error {
 	if err := seed.Run(ctx, pool, emails, time.Now()); err != nil {
 		return err
 	}
-	log.Printf("seeded %d accounts: 4 cars, 500 refuels, 75 repairs, 90 tickets each", len(emails))
+	slog.Info("seeded accounts", "accounts", len(emails), "cars_each", 4, "refuels_each", 500, "repairs_each", 75, "tickets_each", 90)
 	return nil
 }
 
@@ -187,11 +187,11 @@ func isHealthcheckCommand(args []string) bool {
 func runHealthcheck() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("healthcheck: load config: %v", err)
+		fatal("healthcheck: load config", err)
 	}
 
 	if err := healthcheck.Probe(cfg.Port); err != nil {
-		log.Printf("healthcheck: %v", err)
+		slog.Error("healthcheck", "error", err)
 		os.Exit(1)
 	}
 }
@@ -199,42 +199,45 @@ func runHealthcheck() {
 func runServer() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		fatal("load config", err)
 	}
+	// Plain key=value text; output of the standard log package (such as
+	// net/http's own errors) is routed through this handler too.
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel})))
 
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
-		log.Fatalf("run migrations: %v", err)
+		fatal("run migrations", err)
 	}
 
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("connect to database: %v", err)
+		fatal("connect to database", err)
 	}
 	defer pool.Close()
 
 	staticOut, err := fs.Sub(staticFS, "static/out")
 	if err != nil {
-		log.Fatalf("prepare embedded static assets: %v", err)
+		fatal("prepare embedded static assets", err)
 	}
 	staticOut, err = httpserver.WithAnalyticsSnippet(staticOut, cfg.AnalyticsSnippet)
 	if err != nil {
-		log.Fatalf("prepare analytics snippet: %v", err)
+		fatal("prepare analytics snippet", err)
 	}
 	if cfg.AnalyticsSnippet != "" {
-		log.Printf("analytics snippet configured")
+		slog.Info("analytics snippet configured")
 	}
 
 	store := auth.NewStore(pool)
 	if err := store.Prune(ctx, time.Now()); err != nil {
-		log.Printf("prune expired authentication state: %v", err)
+		slog.Error("prune expired authentication state", "error", err)
 	}
 	go func() {
 		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
 		for now := range ticker.C {
 			if err := store.Prune(ctx, now); err != nil {
-				log.Printf("prune expired authentication state: %v", err)
+				slog.Error("prune expired authentication state", "error", err)
 			}
 		}
 	}()
@@ -242,7 +245,7 @@ func runServer() {
 	if cfg.OIDCEnabled() {
 		oidcClient, err = auth.NewOIDCClient(ctx, cfg.OIDCIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.AuthBaseURL+"/api/v1/auth/oidc/callback")
 		if err != nil {
-			log.Fatalf("configure OIDC: %v", err)
+			fatal("configure OIDC", err)
 		}
 	}
 	mailer := auth.NewSMTPMailer(cfg.SMTPFrom, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPTLS, cfg.SMTPUser, cfg.SMTPPassword)
@@ -263,8 +266,14 @@ func runServer() {
 		statsHandler.RegisterRoutes(mux, authService.RequireSession)
 	})
 
-	log.Printf("listening on :%s", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
-		log.Fatalf("serve: %v", err)
+	slog.Info("listening", "port", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, httpserver.Wrap(mux, cfg.LogRequests)); err != nil {
+		fatal("serve", err)
 	}
+}
+
+// fatal logs err at error level and exits, like log.Fatalf did.
+func fatal(msg string, err error) {
+	slog.Error(msg, "error", err)
+	os.Exit(1)
 }

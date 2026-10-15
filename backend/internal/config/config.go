@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"net/url"
 	"os"
@@ -33,7 +34,23 @@ type Config struct {
 	// AnalyticsSnippet is raw operator-provided HTML inserted into the
 	// frontend's index.html before </head>; empty when unset.
 	AnalyticsSnippet string
+	// LogLevel is the minimum level of all log output.
+	LogLevel slog.Level
+	// LogRequests selects which HTTP requests get an access-log entry.
+	LogRequests RequestLogMode
 }
+
+// RequestLogMode selects which HTTP requests get an access-log entry.
+type RequestLogMode string
+
+const (
+	// RequestLogAll logs every request.
+	RequestLogAll RequestLogMode = "all"
+	// RequestLogErrors logs only responses with status 400 or higher.
+	RequestLogErrors RequestLogMode = "errors"
+	// RequestLogOff disables the access log.
+	RequestLogOff RequestLogMode = "off"
+)
 
 // EnvKeys lists every environment variable Load reads, in the order
 // backend/.env.example documents them. config_test.go checks this list
@@ -54,6 +71,8 @@ var EnvKeys = []string{
 	"TRUSTED_PROXIES",
 	"RATE_LIMIT_PER_IP",
 	"ANALYTICS_SNIPPET",
+	"LOG_LEVEL",
+	"LOG_REQUESTS",
 }
 
 var requiredEnvKeys = []string{
@@ -80,7 +99,7 @@ func Load() (*Config, error) {
 		}
 		values[key] = v
 	}
-	for _, key := range append([]string{"SMTP_USER", "SMTP_PASSWORD", "TRUSTED_PROXIES", "RATE_LIMIT_PER_IP", "ANALYTICS_SNIPPET"}, oidcEnvKeys...) {
+	for _, key := range append([]string{"SMTP_USER", "SMTP_PASSWORD", "TRUSTED_PROXIES", "RATE_LIMIT_PER_IP", "ANALYTICS_SNIPPET", "LOG_LEVEL", "LOG_REQUESTS"}, oidcEnvKeys...) {
 		values[key] = os.Getenv(key)
 	}
 	if len(missing) > 0 {
@@ -132,6 +151,28 @@ func Load() (*Config, error) {
 		analyticsSnippet = ""
 	}
 
+	var logLevel slog.Level
+	switch values["LOG_LEVEL"] {
+	case "", "info":
+		logLevel = slog.LevelInfo
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		return nil, fmt.Errorf("LOG_LEVEL must be one of debug, info, warn, error")
+	}
+	logRequests := RequestLogMode(values["LOG_REQUESTS"])
+	switch logRequests {
+	case "":
+		logRequests = RequestLogAll
+	case RequestLogAll, RequestLogErrors, RequestLogOff:
+	default:
+		return nil, fmt.Errorf("LOG_REQUESTS must be one of all, errors, off")
+	}
+
 	return &Config{
 		Port:             values["PORT"],
 		DatabaseURL:      values["DATABASE_URL"],
@@ -148,6 +189,8 @@ func Load() (*Config, error) {
 		TrustedProxies:   trustedProxies,
 		RateLimitPerIP:   rateLimitPerIP,
 		AnalyticsSnippet: analyticsSnippet,
+		LogLevel:         logLevel,
+		LogRequests:      logRequests,
 	}, nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
+	"at.draab/my-car/internal/httpserver"
 )
 
 const (
@@ -102,12 +102,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func (h *Handler) fail(w http.ResponseWriter, op string, err error) {
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err error) {
 	if errors.Is(err, ErrNotFound) {
 		apierror.NotFound(w)
 		return
 	}
-	log.Printf("%s repair: %v", op, err)
+	httpserver.Logger(r.Context()).Error("repair failed", "op", op, "error", err)
 	apierror.Internal(w)
 }
 
@@ -152,7 +152,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, accountID string)
 	}
 	items, next, err := h.store.List(r.Context(), accountID, f, after, limit)
 	if err != nil {
-		h.fail(w, "list", err)
+		h.fail(w, r, "list", err)
 		return
 	}
 	page := struct {
@@ -172,7 +172,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, accountID string)
 func (h *Handler) stations(w http.ResponseWriter, r *http.Request, accountID string) {
 	stations, err := h.store.Stations(r.Context(), accountID)
 	if err != nil {
-		h.fail(w, "list stations of", err)
+		h.fail(w, r, "list stations of", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, stations)
@@ -203,7 +203,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 	}
 	created, err := h.store.Create(r.Context(), accountID, in)
 	if err != nil {
-		h.fail(w, "create", err)
+		h.fail(w, r, "create", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toBody(created))
@@ -212,7 +212,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 func (h *Handler) get(w http.ResponseWriter, r *http.Request, accountID, repairID string) {
 	found, err := h.store.Get(r.Context(), accountID, repairID)
 	if err != nil {
-		h.fail(w, "get", err)
+		h.fail(w, r, "get", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toBody(found))
@@ -232,7 +232,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, accountID, repa
 	}
 	updated, err := h.store.Update(r.Context(), accountID, repairID, p)
 	if err != nil {
-		h.fail(w, "update", err)
+		h.fail(w, r, "update", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toBody(updated))
@@ -240,7 +240,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, accountID, repa
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request, accountID, repairID string) {
 	if err := h.store.Delete(r.Context(), accountID, repairID); err != nil {
-		h.fail(w, "delete", err)
+		h.fail(w, r, "delete", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

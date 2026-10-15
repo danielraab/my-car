@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -51,6 +52,8 @@ func TestLoad_AllPresent(t *testing.T) {
 		OIDCClientID:     "my-car",
 		OIDCClientSecret: "secret",
 		RateLimitPerIP:   true,
+		LogLevel:         slog.LevelInfo,
+		LogRequests:      RequestLogAll,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("Load() = %+v, want %+v", *cfg, *want)
@@ -207,6 +210,42 @@ func TestLoad_AnalyticsSnippet(t *testing.T) {
 		cfg, err := Load()
 		if err != nil || cfg.AnalyticsSnippet != want {
 			t.Errorf("%q: Load() = %+v, err %v; want AnalyticsSnippet %q", raw, cfg, err, want)
+		}
+	}
+}
+
+func TestLoad_LogLevel(t *testing.T) {
+	for raw, want := range map[string]slog.Level{"": slog.LevelInfo, "debug": slog.LevelDebug, "info": slog.LevelInfo, "warn": slog.LevelWarn, "error": slog.LevelError} {
+		setAllEnv(t)
+		t.Setenv("LOG_LEVEL", raw)
+		cfg, err := Load()
+		if err != nil || cfg.LogLevel != want {
+			t.Errorf("%q: Load() = %+v, err %v; want LogLevel %s", raw, cfg, err, want)
+		}
+	}
+	for _, raw := range []string{"verbose", "INFO", "warning"} {
+		setAllEnv(t)
+		t.Setenv("LOG_LEVEL", raw)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "LOG_LEVEL") {
+			t.Errorf("%q: error = %v, want one naming LOG_LEVEL", raw, err)
+		}
+	}
+}
+
+func TestLoad_LogRequests(t *testing.T) {
+	for raw, want := range map[string]RequestLogMode{"": RequestLogAll, "all": RequestLogAll, "errors": RequestLogErrors, "off": RequestLogOff} {
+		setAllEnv(t)
+		t.Setenv("LOG_REQUESTS", raw)
+		cfg, err := Load()
+		if err != nil || cfg.LogRequests != want {
+			t.Errorf("%q: Load() = %+v, err %v; want LogRequests %q", raw, cfg, err, want)
+		}
+	}
+	for _, raw := range []string{"some", "ALL", "false"} {
+		setAllEnv(t)
+		t.Setenv("LOG_REQUESTS", raw)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "LOG_REQUESTS") {
+			t.Errorf("%q: error = %v, want one naming LOG_REQUESTS", raw, err)
 		}
 	}
 }

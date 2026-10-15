@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
+	"at.draab/my-car/internal/httpserver"
 )
 
 const (
@@ -113,7 +113,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func (h *Handler) fail(w http.ResponseWriter, op string, err error) {
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err error) {
 	if errors.Is(err, ErrNotFound) {
 		apierror.NotFound(w)
 		return
@@ -122,7 +122,7 @@ func (h *Handler) fail(w http.ResponseWriter, op string, err error) {
 		apierror.Validation(w, map[string]string{"deregistrationDate": apierror.ReasonBeforeFirstRegistration})
 		return
 	}
-	log.Printf("%s car: %v", op, err)
+	httpserver.Logger(r.Context()).Error("car failed", "op", op, "error", err)
 	apierror.Internal(w)
 }
 
@@ -151,7 +151,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, accountID string)
 	}
 	items, next, err := h.store.List(r.Context(), accountID, after, limit)
 	if err != nil {
-		h.fail(w, "list", err)
+		h.fail(w, r, "list", err)
 		return
 	}
 	page := struct {
@@ -198,7 +198,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 	}
 	c, err := h.store.Create(r.Context(), accountID, in)
 	if err != nil {
-		h.fail(w, "create", err)
+		h.fail(w, r, "create", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toBody(c))
@@ -207,7 +207,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 func (h *Handler) get(w http.ResponseWriter, r *http.Request, accountID, carID string) {
 	c, err := h.store.Get(r.Context(), accountID, carID)
 	if err != nil {
-		h.fail(w, "get", err)
+		h.fail(w, r, "get", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toBody(c))
@@ -228,7 +228,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, accountID, carI
 	if p.FirstRegistration.Set || p.DeregistrationDate.Set {
 		ok, err := h.datesInOrder(r.Context(), accountID, carID, p)
 		if err != nil {
-			h.fail(w, "update", err)
+			h.fail(w, r, "update", err)
 			return
 		}
 		if !ok {
@@ -238,7 +238,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, accountID, carI
 	}
 	c, err := h.store.Update(r.Context(), accountID, carID, p)
 	if err != nil {
-		h.fail(w, "update", err)
+		h.fail(w, r, "update", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toBody(c))
@@ -270,7 +270,7 @@ func deregisteredBeforeFirstRegistration(first, deregistration *string) bool {
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request, accountID, carID string) {
 	if err := h.store.Delete(r.Context(), accountID, carID); err != nil {
-		h.fail(w, "delete", err)
+		h.fail(w, r, "delete", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

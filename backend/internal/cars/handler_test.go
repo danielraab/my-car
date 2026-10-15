@@ -1,9 +1,11 @@
 package cars
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +15,7 @@ import (
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
+	"at.draab/my-car/internal/config"
 	"at.draab/my-car/internal/httpserver"
 )
 
@@ -473,6 +476,37 @@ func TestCarsRequireSessionOnTopLevelMux(t *testing.T) {
 			if rec.Code != http.StatusUnauthorized || repo.calls != 0 {
 				t.Fatalf("%s %s cookie=%v: status = %d, calls = %d", tc.method, tc.target, cookie, rec.Code, repo.calls)
 			}
+		}
+	}
+}
+
+// Through the real mux and middleware chain, a store failure's error entry and
+// the access entry carry the request ID returned in X-Request-Id, and neither
+// contains the concrete car path.
+func TestStoreFailureLogCorrelatesWithRequestID(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	repo := &fakeRepository{err: errors.New("boom")}
+	mux := httpserver.NewMux(okPinger{}, nil, fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}, func(mux *http.ServeMux) {
+		NewHandler(repo).RegisterRoutes(mux, passSession)
+	})
+	rec := httptest.NewRecorder()
+	httpserver.Wrap(mux, config.RequestLogAll).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/cars/"+carID, nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	id := rec.Header().Get("X-Request-Id")
+	lines := strings.Split(strings.TrimSpace(logs.String()), "\n")
+	if id == "" || len(lines) != 2 || !strings.Contains(lines[0], "level=ERROR") || !strings.Contains(lines[0], "error=boom") ||
+		!strings.Contains(lines[1], `route="GET /api/v1/cars/{carId}"`) || !strings.Contains(lines[1], "status=500") {
+		t.Fatalf("X-Request-Id = %q, log = %q", id, logs.String())
+	}
+	for _, line := range lines {
+		if !strings.Contains(line, "request_id="+id) || strings.Contains(line, carID) {
+			t.Errorf("line %q: want request_id=%s and no car ID", line, id)
 		}
 	}
 }

@@ -797,6 +797,7 @@ export interface components {
         /** @description Unexpected server error. */
         ServerError: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -823,7 +824,10 @@ export interface components {
         ReturnTo: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Server-generated ID of this request, also recorded in the backend's log entries for it. Present on every response. */
+        RequestId: string;
+    };
     pathItems: {
         RefuelCreate: {
             parameters: {

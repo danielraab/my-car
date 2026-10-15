@@ -53,6 +53,8 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       RATE_LIMIT_PER_IP: ${RATE_LIMIT_PER_IP:-true}
       ANALYTICS_SNIPPET: ${ANALYTICS_SNIPPET:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_REQUESTS: ${LOG_REQUESTS:-all}
     ports:
       - "8080:8080"
     depends_on:

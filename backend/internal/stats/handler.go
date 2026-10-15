@@ -5,13 +5,13 @@ package stats
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"regexp"
 	"time"
 
 	"at.draab/my-car/internal/apierror"
 	"at.draab/my-car/internal/auth"
+	"at.draab/my-car/internal/httpserver"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -76,7 +76,7 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request, accountID str
 	}
 	items, err := h.store.Expenses(r.Context(), accountID, f)
 	if err != nil {
-		log.Printf("expense statistics: %v", err)
+		httpserver.Logger(r.Context()).Error("expense statistics", "error", err)
 		apierror.Internal(w)
 		return
 	}

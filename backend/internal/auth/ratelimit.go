@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"at.draab/my-car/internal/apierror"
+	"at.draab/my-car/internal/httpserver"
 	"golang.org/x/time/rate"
 )
 
@@ -94,7 +95,7 @@ func (s *Service) limit(group string, mode limitMode, next http.HandlerFunc) htt
 			next(w, r)
 			return
 		}
-		slog.Info("rate limit exceeded", "limit", "client", "group", group, "key", key, "path", r.URL.Path)
+		httpserver.Logger(r.Context()).Info("rate limit exceeded", "limit", "client", "group", group, "key", key, "path", r.Pattern)
 		if mode == limitRedirect {
 			http.Redirect(w, r, rateLimitedLoginPath, http.StatusSeeOther)
 			return
@@ -112,7 +113,7 @@ func (s *Service) allowMagicLinkFor(email string, r *http.Request) bool {
 	if s.limits.recipients.allow(key, s.now()) {
 		return true
 	}
-	slog.Info("rate limit exceeded", "limit", "recipient", "group", groupMagicLinkRequest, "key", key[:12], "path", r.URL.Path)
+	httpserver.Logger(r.Context()).Info("rate limit exceeded", "limit", "recipient", "group", groupMagicLinkRequest, "key", key[:12], "path", r.Pattern)
 	return false
 }
 

@@ -2,7 +2,12 @@ openapi: 3.1.0
 info:
   title: my-car API
   version: 2.2.0
-  description: REST API for the my-car rewrite.
+  description: |-
+    REST API for the my-car rewrite.
+
+    Every response carries an `X-Request-Id` header (see
+    `#/components/headers/RequestId`). The backend's log entries for that
+    request carry the same ID.
   license:
     name: GPL-3.0-only
     url: https://www.gnu.org/licenses/gpl-3.0.html
@@ -790,6 +795,12 @@ components:
       schema:
         type: string
         format: uri-reference
+  headers:
+    RequestId:
+      description: Server-generated ID of this request, also recorded in the backend's log entries for it. Present on every response.
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{16}$
   responses:
     Redirect:
       description: Redirect to the identity provider.
@@ -854,6 +865,9 @@ components:
             type: string
     ServerError:
       description: Unexpected server error.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:

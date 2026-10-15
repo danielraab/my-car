@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"at.draab/my-car/internal/apierror"
+	"at.draab/my-car/internal/httpserver"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
@@ -142,7 +142,7 @@ func (s *Service) beginCeremony(w http.ResponseWriter, ctx context.Context, cook
 		return
 	}
 	if err = s.store.CreatePasskeyChallenge(ctx, digest, kind, accountID, state, s.now().Add(passkeyCeremonyTTL)); err != nil {
-		log.Printf("create passkey %s challenge: %v", kind, err)
+		httpserver.Logger(ctx).Error("create passkey challenge", "kind", kind, "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -176,7 +176,7 @@ func (s *Service) startPasskeyRegistration(w http.ResponseWriter, r *http.Reques
 	}
 	passkeys, err := s.store.ListPasskeys(r.Context(), session.ID)
 	if err != nil {
-		log.Printf("list passkeys: %v", err)
+		httpserver.Logger(r.Context()).Error("list passkeys", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -187,7 +187,7 @@ func (s *Service) startPasskeyRegistration(w http.ResponseWriter, r *http.Reques
 		webauthn.WithExclusions(webauthn.Credentials(user.WebAuthnCredentials()).CredentialDescriptors()),
 	)
 	if err != nil {
-		log.Printf("begin passkey registration: %v", err)
+		httpserver.Logger(r.Context()).Error("begin passkey registration", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -268,7 +268,7 @@ func (s *Service) registerPasskey(w http.ResponseWriter, r *http.Request) {
 	}
 	cred, err := s.rp.CreateCredential(passkeyUser{account: session.Account}, data, parsed)
 	if err != nil {
-		log.Printf("verify passkey registration: %v", err)
+		httpserver.Logger(r.Context()).Warn("verify passkey registration", "error", err)
 		apierror.Write(w, http.StatusBadRequest, codePasskeyRejected, "passkey registration could not be verified", nil)
 		return
 	}
@@ -291,7 +291,7 @@ func (s *Service) registerPasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Printf("store passkey: %v", err)
+		httpserver.Logger(r.Context()).Error("store passkey", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -301,7 +301,7 @@ func (s *Service) registerPasskey(w http.ResponseWriter, r *http.Request) {
 func (s *Service) listPasskeys(w http.ResponseWriter, r *http.Request) {
 	passkeys, err := s.store.ListPasskeys(r.Context(), currentSession(r).ID)
 	if err != nil {
-		log.Printf("list passkeys: %v", err)
+		httpserver.Logger(r.Context()).Error("list passkeys", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -333,7 +333,7 @@ func (s *Service) renamePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Printf("rename passkey: %v", err)
+		httpserver.Logger(r.Context()).Error("rename passkey", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -353,7 +353,7 @@ func (s *Service) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Printf("delete passkey: %v", err)
+		httpserver.Logger(r.Context()).Error("delete passkey", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -366,7 +366,7 @@ func (s *Service) deletePasskey(w http.ResponseWriter, r *http.Request) {
 func (s *Service) startPasskeyLogin(w http.ResponseWriter, r *http.Request) {
 	assertion, data, err := s.rp.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
-		log.Printf("begin passkey login: %v", err)
+		httpserver.Logger(r.Context()).Error("begin passkey login", "error", err)
 		apierror.Internal(w)
 		return
 	}
@@ -403,12 +403,12 @@ func (s *Service) completePasskeyLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	_, cred, err := s.rp.ValidatePasskeyLogin(owner, data, parsed)
 	if err != nil {
-		log.Printf("verify passkey login: %v", err)
+		httpserver.Logger(r.Context()).Warn("verify passkey login", "error", err)
 		rejectPasskeyLogin(w)
 		return
 	}
 	if cred.Authenticator.CloneWarning {
-		log.Printf("verify passkey login: signature counter did not increase; possible cloned authenticator")
+		httpserver.Logger(r.Context()).Warn("verify passkey login: signature counter did not increase; possible cloned authenticator")
 		rejectPasskeyLogin(w)
 		return
 	}
@@ -424,7 +424,7 @@ func (s *Service) completePasskeyLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Printf("record passkey login: %v", err)
+		httpserver.Logger(r.Context()).Error("record passkey login", "error", err)
 		apierror.Internal(w)
 		return
 	}
