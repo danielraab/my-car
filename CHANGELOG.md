@@ -7,6 +7,71 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-15
+
+### Added
+
+- **Attachments**: up to 10 files can be attached to each car, refuel, repair
+  and ticket. Only images (JPEG, PNG, WebP, GIF) and PDFs are accepted; the
+  server checks the type from the file content. Large images are scaled down
+  in the browser before upload. On create forms files are queued and uploaded
+  once the entry is saved; on edit forms they are uploaded or deleted right
+  away. Lists show an attachment icon with the count, and the car Details tab
+  shows the car's attachments. Deleting an entry or car deletes its files too.
+  Car, refuel, repair and ticket responses gain `attachmentCount`. Database
+  migration `000008` adds the attachment tables.
+- **File storage configuration**: attachments are stored on the local
+  filesystem (`FILE_STORAGE=local`, `FILE_STORAGE_PATH`, default) or in an
+  S3-compatible bucket (`FILE_STORAGE=s3` with the `S3_*` variables).
+  `MAX_UPLOAD_BYTES` sets the maximum file size (default 10 MB). An unusable
+  storage configuration stops the backend at startup. The container image
+  stores files in `/data/files`; mount a volume there and back it up together
+  with the database, or uploaded files are lost when the container is
+  recreated.
+- **Attachment viewer**: opening an attachment shows an in-app viewer instead
+  of a new browser tab. It steps through all of the entry's files with
+  buttons, the arrow keys or swipe, renders images scaled to fit and PDFs with
+  pdf.js (loaded only when a PDF is first opened), and offers open-in-new-tab
+  and download. If a PDF can't be rendered, it offers to open it in a new tab.
+- **Request logging**: `LOG_LEVEL` (`debug | info | warn | error`, default
+  `info`) sets the minimum level of all backend log output. `LOG_REQUESTS`
+  (`all | errors | off`, default `all`) selects which HTTP requests get an
+  access-log line with method, route template, status, duration and request
+  ID; it never contains query strings, headers, bodies or concrete `/api/`
+  paths. Every response carries an `X-Request-Id` header, and handler log
+  lines carry the same ID. Invalid values fail startup.
+- Development: `dev.sh` starts the compose `dev` profile, the backend and the
+  Vite dev server in one go.
+
+### Changed
+
+- **Fuel-price chart**: draws one line per car fuel and refuel fuel pair
+  (e.g. "Diesel · Premium") instead of one line per refuel fuel, matching the
+  legacy app. The car's fuel picks the line's hue and the refuel's fuel its
+  shade, so each pair keeps the same colour across cars and date ranges. The
+  chart waits for the car list as well as the chart data and shows the
+  retryable error if either fails.
+- The refuels table shows the date without the time of day.
+- Attachment downloads are privately cacheable for one hour
+  (`Cache-Control: private, max-age=3600, immutable`), and logout sends
+  `Clear-Site-Data: "cache"` so cached files don't stay in a shared browser.
+- All backend logging goes through `log/slog`. The log format changes from
+  `log`'s date prefix to `slog`'s key=value text; anything parsing the old
+  format has to adapt.
+- A panic in a request handler is logged and answered with `500` instead of
+  resetting the connection.
+- A download whose stored file is missing is answered with `404` and logged
+  as a warning, instead of a generic server error.
+- Development: the compose `dev` profile uses DbGate (port 8082, with a
+  preconfigured connection) instead of pgAdmin. `backend/.env.example` now
+  points `AUTH_BASE_URL` at the Vite dev server (`http://localhost:3000`).
+
+### Security
+
+- Rate-limit log entries name the endpoint by its route template instead of
+  the concrete path, so a throttled magic-link request no longer writes its
+  still-valid token to the log.
+
 ## [2.2.0] - 2026-10-13
 
 ### Added
@@ -102,7 +167,8 @@ app is kept in `old/` as reference only.
   inventories every legacy screen, endpoint and derived value as the
   acceptance criterion for the rewrite.
 
-[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/danielraab/my-cars/releases/tag/v2.3.0
 [2.2.0]: https://github.com/danielraab/my-cars/releases/tag/v2.2.0
 [2.1.0]: https://github.com/danielraab/my-cars/releases/tag/v2.1.0
 [2.0.0]: https://github.com/danielraab/my-cars/releases/tag/v2.0.0
