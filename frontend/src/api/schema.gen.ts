@@ -539,8 +539,10 @@ export interface paths {
         /**
          * @description Streams the stored file. The response carries
          *     `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`,
-         *     `Cache-Control: private, no-store` and an inline
-         *     `Content-Disposition` with the original filename.
+         *     `Cache-Control: private, max-age=3600, immutable` and an inline
+         *     `Content-Disposition` with the original filename. An attachment's
+         *     content never changes under its ID, so the browser may reuse it for an
+         *     hour without revalidating. Error responses are not cacheable.
          */
         get: operations["downloadAttachment"];
         put?: never;
@@ -1303,6 +1305,11 @@ export interface operations {
             /** @description Session invalidated and cookie cleared. */
             204: {
                 headers: {
+                    /**
+                     * @description `"cache"`, so privately cached responses such as attachment
+                     *     contents don't stay in the browser after logout.
+                     */
+                    "Clear-Site-Data"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2123,6 +2130,8 @@ export interface operations {
             /** @description The file contents, with the attachment's content type. */
             200: {
                 headers: {
+                    /** @description `private, max-age=3600, immutable`. */
+                    "Cache-Control"?: string;
                     /** @description `inline` with the original filename (RFC 6266). */
                     "Content-Disposition"?: string;
                     [name: string]: unknown;

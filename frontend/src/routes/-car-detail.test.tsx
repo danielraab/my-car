@@ -7,6 +7,14 @@ import { i18n } from '#/i18n'
 import { dateRangeToInstants, defaultFrom } from '#/lib/date-range'
 import { renderApp } from '#/test/render-app'
 
+// The viewer's PDF rendering is covered in the attachment tests.
+vi.mock('#/attachments/pdf', () => ({
+  getDocument: () => ({
+    promise: new Promise(() => {}),
+    destroy: async () => {},
+  }),
+}))
+
 const profile = {
   id: '617c3d87-21b4-4cb9-96f3-e03510892296',
   email: 'driver@example.com',
@@ -162,14 +170,15 @@ describe('car attachments', () => {
     renderApp(`/cars/${golf.id}`)
 
     const section = await screen.findByRole('region', { name: 'Attachments' })
-    const link = await within(section).findByRole('link', {
+    const open = await within(section).findByRole('button', {
       name: 'registration.pdf',
     })
-    expect(link).toHaveAttribute(
-      'href',
-      '/api/v1/attachments/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/content',
-    )
     expect(within(section).getByText('PDF document')).toBeInTheDocument()
+
+    await userEvent.setup().click(open)
+    expect(
+      await screen.findByRole('dialog', { name: 'registration.pdf' }),
+    ).toBeInTheDocument()
   })
 
   it('says when the car has no attachments, in both languages', async () => {

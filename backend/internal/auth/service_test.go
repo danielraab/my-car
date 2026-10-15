@@ -199,8 +199,14 @@ func TestSessionAndLogout(t *testing.T) {
 	if w.Code != 204 || !st.revoked || w.Result().Cookies()[0].MaxAge != -1 {
 		t.Fatalf("logout=%d revoked=%v", w.Code, st.revoked)
 	}
+	if got := w.Header().Get("Clear-Site-Data"); got != `"cache"` {
+		t.Fatalf("Clear-Site-Data=%q", got)
+	}
 	if w = serve(s, "GET", "/api/v1/session", "", cookie); w.Code != 401 {
 		t.Fatalf("revoked status=%d", w.Code)
+	}
+	if w = serve(s, "DELETE", "/api/v1/session", "", cookie); w.Code != 401 || w.Header().Get("Clear-Site-Data") != "" {
+		t.Fatalf("logout without session=%d Clear-Site-Data=%q", w.Code, w.Header().Get("Clear-Site-Data"))
 	}
 }
 func TestOIDCStartCallbackAndReplay(t *testing.T) {

@@ -383,7 +383,7 @@ describe('refuel attachments', () => {
     expect(
       within(
         await screen.findByRole('list', { name: 'Attached files' }),
-      ).getByRole('link', { name: 'receipt.jpg' }),
+      ).getByRole('button', { name: 'receipt.jpg' }),
     ).toBeInTheDocument()
   })
 
@@ -395,9 +395,17 @@ describe('refuel attachments', () => {
     await user.click(
       within(table).getByRole('button', { name: '1 attachment' }),
     )
+    await user.click(await screen.findByRole('button', { name: 'receipt.jpg' }))
+
+    const viewer = await screen.findByRole('dialog', { name: 'receipt.jpg' })
+    expect(within(viewer).getByAltText('receipt.jpg')).toHaveAttribute(
+      'src',
+      `/api/v1/attachments/${receipt.id}/content`,
+    )
+    expect(within(viewer).getByText('1 / 1')).toBeInTheDocument()
     expect(
-      await screen.findByRole('link', { name: 'receipt.jpg' }),
-    ).toHaveAttribute('href', `/api/v1/attachments/${receipt.id}/content`)
+      screen.queryByRole('list', { name: 'Attached files' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows no paperclip on rows without attachments', async () => {

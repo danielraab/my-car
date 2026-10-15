@@ -192,6 +192,13 @@ paths:
       responses:
         '204':
           description: Session invalidated and cookie cleared.
+          headers:
+            Clear-Site-Data:
+              description: |-
+                `"cache"`, so privately cached responses such as attachment
+                contents don't stay in the browser after logout.
+              schema:
+                type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         default:
@@ -954,12 +961,18 @@ paths:
       description: |-
         Streams the stored file. The response carries
         `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`,
-        `Cache-Control: private, no-store` and an inline
-        `Content-Disposition` with the original filename.
+        `Cache-Control: private, max-age=3600, immutable` and an inline
+        `Content-Disposition` with the original filename. An attachment's
+        content never changes under its ID, so the browser may reuse it for an
+        hour without revalidating. Error responses are not cacheable.
       responses:
         '200':
           description: The file contents, with the attachment's content type.
           headers:
+            Cache-Control:
+              description: '`private, max-age=3600, immutable`.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`inline` with the original filename (RFC 6266).'
               schema:

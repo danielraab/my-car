@@ -287,5 +287,8 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ClearSessionCookie(w)
+	// Drops privately cached responses, such as attachment contents, from the
+	// browser. Cookies are cleared above and local storage holds no secrets.
+	w.Header().Set("Clear-Site-Data", `"cache"`)
 	w.WriteHeader(http.StatusNoContent)
 }

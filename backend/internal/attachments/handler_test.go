@@ -354,6 +354,9 @@ func TestOtherAccountsAttachmentsAreNotFound(t *testing.T) {
 		if rec.Code != http.StatusNotFound || bytes.Contains(rec.Body.Bytes(), pdfBytes) {
 			t.Errorf("%s: status = %d, body = %q; want 404 without content", name, rec.Code, rec.Body)
 		}
+		if cc := rec.Header().Get("Cache-Control"); strings.Contains(cc, "max-age") {
+			t.Errorf("%s: Cache-Control = %q; a 404 must not be cacheable", name, cc)
+		}
 	}
 	if len(owner.repo.attachments) != 1 || owner.blobs.count() != 1 || caller.deleted != 0 {
 		t.Fatal("another account's request changed the attachments")
@@ -392,7 +395,7 @@ func TestDownloadServesProtectiveHeaders(t *testing.T) {
 		"Content-Type":            "image/jpeg",
 		"X-Content-Type-Options":  "nosniff",
 		"Content-Security-Policy": "sandbox",
-		"Cache-Control":           "private, no-store",
+		"Cache-Control":           "private, max-age=3600, immutable",
 		"Content-Disposition":     "inline; filename*=utf-8''Tankbeleg%20M%C3%A4rz.jpg",
 	} {
 		if got := h.Get(key); got != want {

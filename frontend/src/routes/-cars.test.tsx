@@ -301,7 +301,7 @@ describe('car creation', () => {
     await user.click(screen.getByRole('button', { name: 'Add car' }))
 
     expect(
-      await screen.findByRole('link', { name: 'registration.pdf' }),
+      await screen.findByRole('button', { name: 'registration.pdf' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe(`/cars/${golf.id}`)
     expect(

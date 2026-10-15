@@ -14,6 +14,7 @@ import {
 import { TwoStepDeleteButton } from '#/components/two-step-delete-button'
 
 import { FileList } from './attachment-list'
+import { useAttachmentViewer } from './attachment-viewer'
 import { FilePicker, RefusalList } from './file-picker'
 import type { Refusal, RefusalReason } from './files'
 import {
@@ -42,7 +43,7 @@ export function useInvalidateAttachments(owner: AttachmentOwner) {
 
 // The attachment card of an edit screen. Unlike the form next to it, every
 // change applies at once: picked files are uploaded and confirmed deletions
-// take effect immediately.
+// take effect immediately. The viewer it opens is read-only.
 export function AttachmentManager({ owner }: { owner: AttachmentOwner }) {
   const { t } = useTranslation()
   const failedAfterCreate = useLocation({
@@ -51,6 +52,7 @@ export function AttachmentManager({ owner }: { owner: AttachmentOwner }) {
   const attachments = useQuery(attachmentListQueryOptions(owner))
   const limits = useQuery(attachmentLimitsQueryOptions)
   const invalidate = useInvalidateAttachments(owner)
+  const { open, viewer } = useAttachmentViewer()
   const [refused, setRefused] = useState<Refusal[]>([])
   const upload = useMutation({
     mutationFn: async (files: File[]) => {
@@ -112,7 +114,6 @@ export function AttachmentManager({ owner }: { owner: AttachmentOwner }) {
                 name: attachment.filename,
                 contentType: attachment.contentType,
                 size: attachment.size,
-                attachmentId: attachment.id,
                 actions: (
                   <DeleteAttachment
                     attachment={attachment}
@@ -120,6 +121,7 @@ export function AttachmentManager({ owner }: { owner: AttachmentOwner }) {
                   />
                 ),
               }))}
+              onOpen={(index) => open(attachments.data, index)}
             />
           )}
           {upload.isPending ? (
@@ -136,6 +138,7 @@ export function AttachmentManager({ owner }: { owner: AttachmentOwner }) {
           <RefusalList refused={refused} limits={limits.data} />
         </>
       )}
+      {viewer}
     </section>
   )
 }

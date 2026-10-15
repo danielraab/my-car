@@ -367,7 +367,7 @@ func (h *Handler) download(w http.ResponseWriter, r *http.Request, accountID, at
 	header.Set("Content-Length", strconv.FormatInt(a.Size, 10))
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Content-Security-Policy", "sandbox")
-	header.Set("Cache-Control", "private, no-store")
+	header.Set("Cache-Control", "private, max-age=3600, immutable")
 	disposition := mime.FormatMediaType("inline", map[string]string{"filename": a.Filename})
 	if disposition == "" {
 		disposition = "inline"
