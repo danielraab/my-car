@@ -1527,16 +1527,56 @@ select:focus-visible {
   fill-opacity: 0.06;
 }
 
-.chart-normal {
+/* Fuel-price lines: the car's fuel picks the hue, the refuel's fuel the
+   shade (normal mid, premium dark, other light). The light shades fall
+   below 3:1 against the chart card; the legend and the refuel table carry
+   them. */
+.chart-fuel-gasoline-normal {
+  --series: #d97706;
+}
+
+.chart-fuel-gasoline-special {
+  --series: #92400e;
+}
+
+.chart-fuel-gasoline-other {
+  --series: #fbbf24;
+}
+
+.chart-fuel-diesel-normal {
   --series: #2563eb;
 }
 
-.chart-special {
-  --series: #dc2626;
+.chart-fuel-diesel-special {
+  --series: #1e3a8a;
 }
 
-.chart-other {
-  --series: #64748b;
+.chart-fuel-diesel-other {
+  --series: #60a5fa;
+}
+
+.chart-fuel-electric-normal {
+  --series: #0d9488;
+}
+
+.chart-fuel-electric-special {
+  --series: #115e59;
+}
+
+.chart-fuel-electric-other {
+  --series: #2dd4bf;
+}
+
+.chart-fuel-other-normal {
+  --series: #57534e;
+}
+
+.chart-fuel-other-special {
+  --series: #1c1917;
+}
+
+.chart-fuel-other-other {
+  --series: #a8a29e;
 }
 
 .chart-consumption {

@@ -294,7 +294,8 @@ export const resources = {
         filter: 'Filter by car',
         allCars: 'All cars',
         chart: 'Fuel price history',
-        chartDescription: 'Price per litre over time, one line per fuel.',
+        chartDescription:
+          'Price per litre over time, one line per car fuel and fuel grade.',
         chartEmpty: 'There are no refuels to chart yet.',
         consumptionChartEmpty:
           'Not enough refuels with odometer readings in this range.',
@@ -959,7 +960,7 @@ export const resources = {
         allCars: 'Alle Autos',
         chart: 'Kraftstoffpreisverlauf',
         chartDescription:
-          'Preis pro Liter im Zeitverlauf, eine Linie pro Kraftstoff.',
+          'Preis pro Liter im Zeitverlauf, eine Linie je Kraftstoff des Autos und getankter Sorte.',
         chartEmpty: 'Es gibt noch keine Tankvorgänge für das Diagramm.',
         consumptionChartEmpty:
           'Nicht genug Tankvorgänge mit Kilometerstand in diesem Zeitraum.',

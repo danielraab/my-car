@@ -1,16 +1,19 @@
 import { useTranslation } from 'react-i18next'
 
-import { type Refuel, refuelFuels } from '#/api/client'
+import { type Car, carFuels, type Refuel, refuelFuels } from '#/api/client'
 import { LineChart } from '#/components/line-chart'
 import { formatValueTick } from '#/lib/chart-ticks'
 
-// A line of the per-litre price over time for each fuel present in items,
-// which arrive in date order.
+// A line of the per-litre price over time for each pair of car fuel and
+// refuel fuel present in items, which arrive in date order. Refuels whose
+// car is not in cars are left out.
 export function FuelPriceChart({
   items,
+  cars,
   label,
 }: {
   items: Refuel[]
+  cars: Map<string, Car>
   label: string
 }) {
   const { t, i18n } = useTranslation()
@@ -27,18 +30,23 @@ export function FuelPriceChart({
       showLegend
       formatValue={(value) => price.format(value)}
       empty={<p className="chart-empty">{t('refuels.chartEmpty')}</p>}
-      series={refuelFuels.map((fuel) => ({
-        key: fuel,
-        className: `chart-${fuel}`,
-        label: t(`refuels.fuels.${fuel}`),
-        points: items
-          .filter((item) => item.fuel === fuel)
-          .map((item) => ({
-            id: item.id,
-            time: Date.parse(item.date),
-            value: Number(item.perLiter),
-          })),
-      }))}
+      series={carFuels.flatMap((carFuel) =>
+        refuelFuels.map((fuel) => ({
+          key: `${carFuel}-${fuel}`,
+          className: `chart-fuel-${carFuel}-${fuel}`,
+          label: `${t(`cars.fuels.${carFuel}`)} · ${t(`refuels.fuels.${fuel}`)}`,
+          points: items
+            .filter(
+              (item) =>
+                item.fuel === fuel && cars.get(item.carId)?.fuel === carFuel,
+            )
+            .map((item) => ({
+              id: item.id,
+              time: Date.parse(item.date),
+              value: Number(item.perLiter),
+            })),
+        })),
+      )}
     />
   )
 }

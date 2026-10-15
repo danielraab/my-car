@@ -86,25 +86,34 @@ function RefuelsPage() {
       <section className="chart-card" aria-labelledby="refuels-chart-title">
         <h2 id="refuels-chart-title">{t('refuels.chart')}</h2>
         <p className="chart-description">{t('refuels.chartDescription')}</p>
-        {chart.isPending ? (
-          <output className="chart-status">
-            <LoaderCircle className="spin" aria-hidden="true" size={20} />
-            {t('refuels.loading')}
-          </output>
-        ) : chart.isError ? (
+        {/* Each line is a car fuel and refuel fuel pair, so the chart
+            needs the cars as well as its series. */}
+        {chart.isError || cars.isError ? (
           <div className="chart-status" role="alert">
             <p>{t('refuels.chartLoadError')}</p>
             <button
               className="button button-secondary"
               type="button"
-              onClick={() => chart.refetch()}
+              onClick={() => {
+                if (chart.isError) chart.refetch()
+                if (cars.isError) cars.refetch()
+              }}
             >
               <RefreshCw aria-hidden="true" size={17} />
               {t('refuels.retry')}
             </button>
           </div>
+        ) : chart.isPending || cars.isPending ? (
+          <output className="chart-status">
+            <LoaderCircle className="spin" aria-hidden="true" size={20} />
+            {t('refuels.loading')}
+          </output>
         ) : (
-          <FuelPriceChart items={chart.data.items} label={t('refuels.chart')} />
+          <FuelPriceChart
+            items={chart.data.items}
+            cars={carsById}
+            label={t('refuels.chart')}
+          />
         )}
       </section>
 

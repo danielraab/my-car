@@ -113,6 +113,46 @@ beforeEach(async () => {
   vi.unstubAllGlobals()
 })
 describe('refuels', () => {
+  it('charts only once the cars are loaded and retries failed cars', async () => {
+    const calls = backend()
+    const delegate = vi.mocked(fetch)
+    let cars: (value: Response) => void = () => {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((path: string, init?: RequestInit) => {
+        if (path !== '/api/v1/cars?limit=100') return delegate(path, init)
+        calls.push(`GET ${path}`)
+        return new Promise<Response>((resolve) => {
+          cars = resolve
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/refuels')
+    const chart = await screen.findByRole('region', {
+      name: 'Fuel price history',
+    })
+    await waitFor(() =>
+      expect(query(calls, '/api/v1/refuels/chart')).not.toBeUndefined(),
+    )
+    expect(within(chart).queryByRole('slider')).not.toBeInTheDocument()
+    expect(within(chart).getByRole('status')).toBeInTheDocument()
+
+    cars(response({ code: 'internal_error', message: 'boom' }, 500))
+    expect(
+      await within(chart).findByText(
+        'The fuel price history could not be loaded.',
+      ),
+    ).toBeInTheDocument()
+
+    await user.click(within(chart).getByRole('button', { name: 'Try again' }))
+    cars(response({ items: [car], nextCursor: null }))
+    expect(
+      await within(chart).findByRole('slider', { name: 'Fuel price history' }),
+    ).toBeInTheDocument()
+    expect(within(chart).getByText('Diesel · Normal')).toBeInTheDocument()
+  })
+
   it('shows the complete chart, table and total and filters both queries', async () => {
     const calls = backend()
     const user = userEvent.setup()

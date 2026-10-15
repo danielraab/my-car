@@ -14,7 +14,7 @@ const start = new Date(2026, 0, 1).getTime()
 const series: LineSeries[] = [
   {
     key: 'a',
-    className: 'chart-normal',
+    className: 'chart-fuel-diesel-normal',
     label: 'Normal',
     points: [
       { id: 'p0', time: start, value: 0 },
@@ -24,7 +24,7 @@ const series: LineSeries[] = [
   },
   {
     key: 'b',
-    className: 'chart-special',
+    className: 'chart-fuel-diesel-special',
     label: 'Premium',
     points: [{ id: 'a', time: start + 65 * day, value: 100 }],
   },

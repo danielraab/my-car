@@ -25,8 +25,8 @@ highlighted while the popover is shown.
 - **THEN** the popover shows point B
 
 #### Scenario: Chart with several series
-- **WHEN** the user hovers the fuel-price chart nearest to a diesel refuel
-- **THEN** the popover names the diesel series along with the date and per-litre price
+- **WHEN** the user hovers the fuel-price chart nearest to a normal refuel of a diesel car
+- **THEN** the popover names the "Diesel · Normal" series along with the date and per-litre price
 
 ### Requirement: Bar charts reveal a whole column in a popover
 Every stacked bar chart SHALL show a popover for one active category at a
