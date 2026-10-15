@@ -35,6 +35,9 @@ const session = {
     email: 'driver@example.com',
     firstName: 'Ada',
     lastName: 'Lovelace',
+    currency: 'EUR',
+    volumeUnit: 'liter',
+    distanceUnit: 'kilometer',
   },
 }
 

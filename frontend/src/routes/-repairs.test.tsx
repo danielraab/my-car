@@ -12,6 +12,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 
 const golf: Car = {
@@ -473,7 +476,7 @@ describe('repair creation', () => {
     expect(amount).toHaveAttribute('aria-invalid', 'true')
     expect(amount).toHaveAttribute(
       'aria-describedby',
-      'repair-amount-hint repair-amount-error',
+      'repair-amount-unit repair-amount-hint repair-amount-error',
     )
     expect(screen.getByRole('combobox', { name: 'Garage' })).toHaveValue(
       'Garage Huber',

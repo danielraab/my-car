@@ -11,6 +11,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 
 const golf: Car = {
@@ -120,7 +123,7 @@ describe('cars list', () => {
     )
     expect(rows[1]).toHaveTextContent('Diesel')
     expect(rows[1]).toHaveTextContent('Mar 1, 2019')
-    expect(rows[1]).toHaveTextContent('18,500.50')
+    expect(rows[1]).toHaveTextContent('€18,500.50')
     expect(rows[2]).toHaveTextContent('Electric')
     expect(rows[2]).toHaveTextContent('Not recorded')
     expect(screen.getByRole('link', { name: 'Add car' })).toHaveAttribute(
@@ -242,7 +245,7 @@ describe('cars list', () => {
     const row = screen.getAllByRole('row')[1]
     expect(row).toHaveTextContent('Benzin')
     expect(row).toHaveTextContent('01.03.2019')
-    expect(row).toHaveTextContent('18.500,50')
+    expect(row).toHaveTextContent('18.500,50 €')
     expect(
       screen.getByRole('link', { name: 'Auto hinzufügen' }),
     ).toBeInTheDocument()
@@ -497,7 +500,7 @@ describe('car detail', () => {
       ['License plate', 'W-123AB'],
       ['Vehicle identification number (FIN)', 'Not recorded'],
       ['Purchase date', 'Apr 15, 2019'],
-      ['Purchase price', '18,500.50'],
+      ['Purchase price', '€18,500.50'],
       ['Active', 'Active'],
       ['Deregistration date', 'Not recorded'],
       ['Information', 'Not recorded'],

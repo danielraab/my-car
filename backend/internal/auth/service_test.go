@@ -108,7 +108,7 @@ func (f *fakeOIDC) Verify(context.Context, string, string, string) (VerifiedIden
 }
 
 func newTestService() (*Service, *fakeStore, *fakeMailer, *fakeOIDC) {
-	st := &fakeStore{account: Account{ID: "account-id", Email: "driver@example.com"}}
+	st := &fakeStore{account: Account{ID: "account-id", Email: "driver@example.com", Currency: "CHF", VolumeUnit: "gallon", DistanceUnit: "mile"}}
 	m := &fakeMailer{}
 	o := &fakeOIDC{identity: VerifiedIdentity{Issuer: "https://id.example", Subject: "sub", Email: "driver@example.com"}}
 	s := NewService(st, m, o, "https://cars.example")
@@ -192,7 +192,7 @@ func TestSessionAndLogout(t *testing.T) {
 	st.expires = s.now().Add(time.Hour)
 	cookie := &http.Cookie{Name: SessionCookieName, Value: "session"}
 	w := serve(s, "GET", "/api/v1/session", "", cookie)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"email":"driver@example.com"`) {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"email":"driver@example.com"`) || !strings.Contains(w.Body.String(), `"currency":"CHF","volumeUnit":"gallon","distanceUnit":"mile"`) {
 		t.Fatalf("session=%d %s", w.Code, w.Body.String())
 	}
 	w = serve(s, "DELETE", "/api/v1/session", "", cookie)

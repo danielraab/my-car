@@ -15,27 +15,28 @@ import (
 	"at.draab/my-car/internal/httpserver"
 )
 
-var caller = auth.Account{ID: "11111111-1111-1111-1111-111111111111", Email: "me@example.com", FirstName: "Ada", LastName: "Lovelace"}
+var caller = auth.Account{ID: "11111111-1111-1111-1111-111111111111", Email: "me@example.com", FirstName: "Ada", LastName: "Lovelace", Currency: "EUR", VolumeUnit: "liter", DistanceUnit: "kilometer"}
 
 type fakeRepository struct {
 	calls       int
 	first, last *string
+	update      Update
 	err         error
 }
 
-func (f *fakeRepository) UpdateAccountNames(_ context.Context, id string, first, last *string) (auth.Account, error) {
+func (f *fakeRepository) UpdateProfile(_ context.Context, id string, u Update) (auth.Account, error) {
 	f.calls++
-	f.first, f.last = first, last
+	f.update = u
+	f.first, f.last = u.FirstName, u.LastName
 	if f.err != nil {
 		return auth.Account{}, f.err
 	}
 	a := caller
 	a.ID = id
-	if first != nil {
-		a.FirstName = *first
-	}
-	if last != nil {
-		a.LastName = *last
+	for dst, src := range map[*string]*string{&a.FirstName: u.FirstName, &a.LastName: u.LastName, &a.Currency: u.Currency, &a.VolumeUnit: u.VolumeUnit, &a.DistanceUnit: u.DistanceUnit} {
+		if src != nil {
+			*dst = *src
+		}
 	}
 	return a, nil
 }
@@ -72,7 +73,7 @@ func TestGetMeReturnsCallerProfile(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	got := decodeMap(t, rec)
-	want := map[string]any{"id": caller.ID, "email": caller.Email, "firstName": caller.FirstName, "lastName": caller.LastName}
+	want := map[string]any{"id": caller.ID, "email": caller.Email, "firstName": caller.FirstName, "lastName": caller.LastName, "currency": "EUR", "volumeUnit": "liter", "distanceUnit": "kilometer"}
 	if len(got) != len(want) {
 		t.Fatalf("body = %v", got)
 	}
@@ -112,6 +113,21 @@ func TestPatchMeUpdatesNames(t *testing.T) {
 	}
 }
 
+func TestPatchMeUpdatesDisplaySettings(t *testing.T) {
+	repo := &fakeRepository{}
+	rec := serve(t, repo, passSession, http.MethodPatch, `{"currency":"USD","volumeUnit":"gallon","distanceUnit":"mile"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+	if repo.update.FirstName != nil || repo.update.LastName != nil {
+		t.Fatalf("names supplied: %+v", repo.update)
+	}
+	got := decodeMap(t, rec)
+	if got["currency"] != "USD" || got["volumeUnit"] != "gallon" || got["distanceUnit"] != "mile" || got["firstName"] != "Ada" {
+		t.Fatalf("body = %v", got)
+	}
+}
+
 func TestPatchMeRejectsInvalidBodies(t *testing.T) {
 	tests := []struct {
 		name, body string
@@ -124,6 +140,14 @@ func TestPatchMeRejectsInvalidBodies(t *testing.T) {
 		{"numeric name", `{"lastName":7}`, map[string]string{"lastName": "invalid_type"}},
 		{"overlong after trim", `{"lastName":" ` + strings.Repeat("x", MaxNameLength+1) + ` "}`, map[string]string{"lastName": "too_long"}},
 		{"all errors collected", `{"email":"x@example.com","firstName":false,"id":"1"}`, map[string]string{"email": "read_only", "firstName": "invalid_type", "id": "unknown"}},
+		{"unknown currency", `{"currency":"XYZ"}`, map[string]string{"currency": "invalid_enum"}},
+		{"lowercase currency", `{"currency":"usd"}`, map[string]string{"currency": "invalid_enum"}},
+		{"long currency", `{"currency":"EURO"}`, map[string]string{"currency": "invalid_enum"}},
+		{"numeric currency", `{"currency":978}`, map[string]string{"currency": "invalid_type"}},
+		{"unknown volume unit", `{"volumeUnit":"barrel"}`, map[string]string{"volumeUnit": "invalid_enum"}},
+		{"unknown distance unit", `{"distanceUnit":"furlong"}`, map[string]string{"distanceUnit": "invalid_enum"}},
+		{"null unit", `{"distanceUnit":null}`, map[string]string{"distanceUnit": "invalid_type"}},
+		{"valid name with invalid setting", `{"firstName":"Grace","volumeUnit":"Liter"}`, map[string]string{"volumeUnit": "invalid_enum"}},
 		{"empty object", `{}`, map[string]string{"_body": "required"}},
 		{"malformed json", `{"firstName":`, nil},
 		{"not an object", `["firstName"]`, nil},

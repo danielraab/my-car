@@ -1,7 +1,6 @@
 import { LoaderCircle, Save } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
 import {
   ApiError,
   type Car,
@@ -10,6 +9,8 @@ import {
   type RepairType,
   repairTypes,
 } from '#/api/client'
+import { InputSuffix } from '#/components/input-suffix'
+import { useUnitFormat } from '#/lib/display-units'
 
 import { fromLocalInput, toLocalInput } from './format'
 
@@ -102,6 +103,7 @@ export function RepairForm({
   attachments,
 }: RepairFormProps) {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const [values, setValues] = useState(() =>
     initialValues(repair, initialCarId),
   )
@@ -147,20 +149,28 @@ export function RepairForm({
       'aria-invalid': boolean
       'aria-describedby': string | undefined
     }) => ReactNode,
-    options: { optional?: boolean; hint?: boolean; wide?: boolean } = {},
+    options: {
+      optional?: boolean
+      hint?: boolean
+      wide?: boolean
+      label?: string
+      suffix?: string
+    } = {},
   ) {
     const id = `repair-${name}`
     const invalid = invalidFields.includes(name)
+    const suffixId = options.suffix ? `${id}-unit` : undefined
     const hintId = options.hint ? `${id}-hint` : undefined
     const errorId = invalid ? `${id}-error` : undefined
-    const describedBy = [hintId, errorId].filter(Boolean).join(' ')
+    const describedBy = [suffixId, hintId, errorId].filter(Boolean).join(' ')
     const reason = reasons[name]
     return (
       <div
         className={options.wide ? 'form-field form-field-wide' : 'form-field'}
       >
         <label htmlFor={id}>
-          {t(`repairs.fields.${name === 'carId' ? 'car' : name}`)}
+          {options.label ??
+            t(`repairs.fields.${name === 'carId' ? 'car' : name}`)}
           {options.optional ? (
             <span className="field-optional"> ({t('repairs.optional')})</span>
           ) : null}
@@ -172,6 +182,9 @@ export function RepairForm({
             'aria-invalid': invalid,
             'aria-describedby': describedBy || undefined,
           })}
+          {suffixId && options.suffix ? (
+            <InputSuffix id={suffixId}>{options.suffix}</InputSuffix>
+          ) : null}
         </div>
         {hintId ? (
           <p className="field-hint" id={hintId}>
@@ -255,7 +268,11 @@ export function RepairForm({
               }
             />
           ),
-          { optional: true },
+          {
+            optional: true,
+            label: units.odometerReadingName,
+            suffix: units.distanceSymbol,
+          },
         )}
         {field('type', (common) => (
           <select
@@ -283,7 +300,7 @@ export function RepairForm({
               onChange={(event) => change('amount', event.target.value)}
             />
           ),
-          { hint: true },
+          { hint: true, suffix: units.currencySymbol },
         )}
         {field(
           'description',

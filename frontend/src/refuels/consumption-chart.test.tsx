@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Refuel } from '#/api/client'
 import { i18n } from '#/i18n'
+import { DisplayUnitsContext } from '#/lib/display-units'
 
 import { ConsumptionChart } from './consumption-chart'
 
@@ -74,6 +75,21 @@ describe('ConsumptionChart', () => {
       'Mar 2',
       'Mar 9',
     ])
+  })
+
+  it('names the account units without converting the values', async () => {
+    const user = userEvent.setup()
+    render(
+      <DisplayUnitsContext.Provider
+        value={{ currency: 'USD', volumeUnit: 'gallon', distanceUnit: 'mile' }}
+      >
+        <ConsumptionChart items={items} label="Consumption" />
+      </DisplayUnitsContext.Provider>,
+    )
+    await user.tab()
+    expect(document.querySelector('.chart-popover')).toHaveTextContent(
+      'Feb 10, 20268 gal/100 mi',
+    )
   })
 
   it('shows each refuel in a popover from the keyboard', async () => {

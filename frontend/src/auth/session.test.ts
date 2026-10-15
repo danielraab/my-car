@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { ApiError, UnauthorizedError } from '#/api/client'
+import { ApiError, type Session, UnauthorizedError } from '#/api/client'
 
 vi.mock('#/api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/api/client')>()
@@ -15,12 +15,15 @@ const getSessionMock = vi.mocked(getSession)
 
 describe('resolveSession', () => {
   it('returns the authenticated session', async () => {
-    const session = {
+    const session: Session = {
       profile: {
         id: 'id',
         email: 'driver@example.com',
         firstName: 'Ada',
         lastName: 'Lovelace',
+        currency: 'EUR',
+        volumeUnit: 'liter',
+        distanceUnit: 'kilometer',
       },
     }
     getSessionMock.mockResolvedValueOnce(session)

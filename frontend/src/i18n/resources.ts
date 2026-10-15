@@ -13,6 +13,20 @@ export const resources = {
       github: {
         label: 'Source on GitHub',
       },
+      units: {
+        value: '{{value}} {{unit}}',
+        consumption: '{{volume}}/100 {{distance}}',
+        volume: { liter: 'l', gallon: 'gal' },
+        distance: { kilometer: 'km', mile: 'mi' },
+        volumeName: { liter: 'Litres', gallon: 'Gallons' },
+        perVolume: { liter: 'Per litre', gallon: 'Per gallon' },
+        volumeSingular: { liter: 'litre', gallon: 'gallon' },
+        odometerColumn: { kilometer: 'Odometer', mile: 'Odometer' },
+        odometerReading: {
+          kilometer: 'Odometer reading',
+          mile: 'Odometer reading',
+        },
+      },
       navigation: {
         label: 'Application navigation',
         open: 'Open navigation',
@@ -93,7 +107,8 @@ export const resources = {
       profile: {
         eyebrow: 'Your account',
         title: 'Profile',
-        description: 'Manage the name shown in My cars.',
+        description:
+          'Manage the name shown in My cars and how values are labelled.',
         loading: 'Loading your profile…',
         loadErrorTitle: 'Profile unavailable',
         loadError: 'We could not load your profile. Please try again.',
@@ -103,6 +118,14 @@ export const resources = {
           'You sign in with this address, so it cannot be changed here.',
         firstNameLabel: 'First name',
         lastNameLabel: 'Last name',
+        unitsTitle: 'Currency and units',
+        unitsHint:
+          'These settings only change how values are labelled. Existing amounts, volumes and distances are not converted.',
+        currencyLabel: 'Currency',
+        volumeUnitLabel: 'Volume',
+        distanceUnitLabel: 'Distance',
+        volumeUnits: { liter: 'Litres (l)', gallon: 'Gallons (gal)' },
+        distanceUnits: { kilometer: 'Kilometres (km)', mile: 'Miles (mi)' },
         save: 'Save changes',
         saving: 'Saving…',
         saved: 'Your profile has been saved.',
@@ -110,6 +133,7 @@ export const resources = {
         fieldErrors: {
           too_long: 'Use at most 100 characters.',
           invalid_type: 'Enter text only.',
+          invalid_enum: 'Choose one of the offered values.',
           invalid: 'Check this value.',
         },
       },
@@ -264,7 +288,7 @@ export const resources = {
           consumption: {
             title: 'Consumption',
             description:
-              'Litres per 100 km over time, from refuels with odometer readings.',
+              'Consumption in {{unit}} over time, from refuels with odometer readings.',
             loadError: 'The consumption history could not be loaded.',
           },
         },
@@ -295,7 +319,7 @@ export const resources = {
         allCars: 'All cars',
         chart: 'Fuel price history',
         chartDescription:
-          'Price per litre over time, one line per car fuel and fuel grade.',
+          'Price per {{volume}} over time, one line per car fuel and fuel grade.',
         chartEmpty: 'There are no refuels to chart yet.',
         consumptionChartEmpty:
           'Not enough refuels with odometer readings in this range.',
@@ -313,10 +337,6 @@ export const resources = {
         notRecorded: 'Not recorded',
         unknownCar: 'Unknown car',
         optional: 'optional',
-        odometerValue: '{{value}} km',
-        litersValue: '{{value}} l',
-        consumptionValue: '{{value}} l/100 km',
-        odometerColumn: 'Odometer',
         chooseCar: 'Choose a car',
         carsLoading: 'Loading your cars…',
         carsLoadError: 'We could not load your cars. Please try again.',
@@ -327,10 +347,7 @@ export const resources = {
           car: 'Car',
           date: 'Date and time',
           station: 'Station',
-          odometerReading: 'Odometer reading (km)',
           fuel: 'Fuel',
-          liters: 'Litres',
-          perLiter: 'Per litre',
           amount: 'Amount',
           consumption: 'Consumption',
         },
@@ -402,8 +419,6 @@ export const resources = {
         notRecorded: 'Not recorded',
         unknownCar: 'Unknown car',
         optional: 'optional',
-        odometerValue: '{{value}} km',
-        odometerColumn: 'Odometer',
         chooseCar: 'Choose a car',
         carsLoading: 'Loading your cars…',
         carsLoadError: 'We could not load your cars. Please try again.',
@@ -414,7 +429,6 @@ export const resources = {
           car: 'Car',
           date: 'Date and time',
           station: 'Garage',
-          odometerReading: 'Odometer reading (km)',
           type: 'Type',
           amount: 'Amount',
           description: 'Description',
@@ -664,6 +678,17 @@ export const resources = {
       github: {
         label: 'Quellcode auf GitHub',
       },
+      units: {
+        value: '{{value}} {{unit}}',
+        consumption: '{{volume}}/100 {{distance}}',
+        volume: { liter: 'l', gallon: 'gal' },
+        distance: { kilometer: 'km', mile: 'mi' },
+        volumeName: { liter: 'Liter', gallon: 'Gallonen' },
+        perVolume: { liter: 'Pro Liter', gallon: 'Pro Gallone' },
+        volumeSingular: { liter: 'Liter', gallon: 'Gallone' },
+        odometerColumn: { kilometer: 'Kilometerstand', mile: 'Meilenstand' },
+        odometerReading: { kilometer: 'Kilometerstand', mile: 'Meilenstand' },
+      },
       navigation: {
         label: 'Anwendungsnavigation',
         open: 'Navigation öffnen',
@@ -745,7 +770,8 @@ export const resources = {
       profile: {
         eyebrow: 'Dein Konto',
         title: 'Profil',
-        description: 'Verwalte den Namen, der in My cars angezeigt wird.',
+        description:
+          'Verwalte den Namen, der in My cars angezeigt wird, und wie Werte beschriftet werden.',
         loading: 'Profil wird geladen…',
         loadErrorTitle: 'Profil nicht verfügbar',
         loadError:
@@ -756,6 +782,14 @@ export const resources = {
           'Mit dieser Adresse meldest du dich an, daher kann sie hier nicht geändert werden.',
         firstNameLabel: 'Vorname',
         lastNameLabel: 'Nachname',
+        unitsTitle: 'Währung und Einheiten',
+        unitsHint:
+          'Diese Einstellungen ändern nur die Beschriftung der Werte. Vorhandene Beträge, Mengen und Entfernungen werden nicht umgerechnet.',
+        currencyLabel: 'Währung',
+        volumeUnitLabel: 'Menge',
+        distanceUnitLabel: 'Entfernung',
+        volumeUnits: { liter: 'Liter (l)', gallon: 'Gallonen (gal)' },
+        distanceUnits: { kilometer: 'Kilometer (km)', mile: 'Meilen (mi)' },
         save: 'Änderungen speichern',
         saving: 'Wird gespeichert…',
         saved: 'Dein Profil wurde gespeichert.',
@@ -764,6 +798,7 @@ export const resources = {
         fieldErrors: {
           too_long: 'Verwende höchstens 100 Zeichen.',
           invalid_type: 'Gib nur Text ein.',
+          invalid_enum: 'Wähle einen der angebotenen Werte.',
           invalid: 'Bitte überprüfe diesen Wert.',
         },
       },
@@ -928,7 +963,7 @@ export const resources = {
           consumption: {
             title: 'Verbrauch',
             description:
-              'Liter pro 100 km im Zeitverlauf, aus Tankvorgängen mit Kilometerstand.',
+              'Verbrauch in {{unit}} im Zeitverlauf, aus Tankvorgängen mit {{odometer}}.',
             loadError: 'Der Verbrauchsverlauf konnte nicht geladen werden.',
           },
         },
@@ -960,10 +995,10 @@ export const resources = {
         allCars: 'Alle Autos',
         chart: 'Kraftstoffpreisverlauf',
         chartDescription:
-          'Preis pro Liter im Zeitverlauf, eine Linie je Kraftstoff des Autos und getankter Sorte.',
+          'Preis pro {{volume}} im Zeitverlauf, eine Linie je Kraftstoff des Autos und getankter Sorte.',
         chartEmpty: 'Es gibt noch keine Tankvorgänge für das Diagramm.',
         consumptionChartEmpty:
-          'Nicht genug Tankvorgänge mit Kilometerstand in diesem Zeitraum.',
+          'Nicht genug Tankvorgänge mit {{odometer}} in diesem Zeitraum.',
         chartLoadError:
           'Der Kraftstoffpreisverlauf konnte nicht geladen werden.',
         loading: 'Deine Tankvorgänge werden geladen…',
@@ -981,10 +1016,6 @@ export const resources = {
         notRecorded: 'Nicht erfasst',
         unknownCar: 'Unbekanntes Auto',
         optional: 'optional',
-        odometerValue: '{{value}} km',
-        litersValue: '{{value}} l',
-        consumptionValue: '{{value}} l/100 km',
-        odometerColumn: 'Kilometerstand',
         chooseCar: 'Wähle ein Auto',
         carsLoading: 'Deine Autos werden geladen…',
         carsLoadError:
@@ -997,10 +1028,7 @@ export const resources = {
           car: 'Auto',
           date: 'Datum und Uhrzeit',
           station: 'Tankstelle',
-          odometerReading: 'Kilometerstand (km)',
           fuel: 'Kraftstoff',
-          liters: 'Liter',
-          perLiter: 'Pro Liter',
           amount: 'Betrag',
           consumption: 'Verbrauch',
         },
@@ -1081,8 +1109,6 @@ export const resources = {
         notRecorded: 'Nicht erfasst',
         unknownCar: 'Unbekanntes Auto',
         optional: 'optional',
-        odometerValue: '{{value}} km',
-        odometerColumn: 'Kilometerstand',
         chooseCar: 'Wähle ein Auto',
         carsLoading: 'Deine Autos werden geladen…',
         carsLoadError:
@@ -1095,7 +1121,6 @@ export const resources = {
           car: 'Auto',
           date: 'Datum und Uhrzeit',
           station: 'Werkstatt',
-          odometerReading: 'Kilometerstand (km)',
           type: 'Art',
           amount: 'Betrag',
           description: 'Beschreibung',

@@ -12,6 +12,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 
 const golf: Car = {
@@ -136,9 +139,9 @@ describe('dashboard', () => {
       new Intl.DateTimeFormat('en', { month: 'short' }).format(
         new Date(currentYear, index, 1),
       )
-    expect(all[1]).toHaveTextContent(`${month(0)}0.000.000.000.00`)
-    expect(all[3]).toHaveTextContent(`${month(2)}0.300.0036.0036.30`)
-    expect(all[7]).toHaveTextContent(`${month(6)}0.00120.500.00120.50`)
+    expect(all[1]).toHaveTextContent(`${month(0)}€0.00€0.00€0.00€0.00`)
+    expect(all[3]).toHaveTextContent(`${month(2)}€0.30€0.00€36.00€36.30`)
+    expect(all[7]).toHaveTextContent(`${month(6)}€0.00€120.50€0.00€120.50`)
     const legend = document.querySelector('.chart-legend')
     expect(legend).toHaveTextContent('Refuels')
     expect(legend).toHaveTextContent('Repairs')
@@ -362,7 +365,7 @@ describe('dashboard', () => {
       new Intl.DateTimeFormat('de', { month: 'short' }).format(
         new Date(2025, index, 1),
       )
-    expect(all[3]).toHaveTextContent(`${month(2)}0,300,0036,0036,30`)
+    expect(all[3]).toHaveTextContent(`${month(2)}0,30 €0,00 €36,00 €36,30 €`)
     expect(all[10]).toHaveTextContent(month(9))
   })
 })

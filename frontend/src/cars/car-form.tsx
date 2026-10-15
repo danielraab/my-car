@@ -2,7 +2,6 @@ import { Description, Field, Label, Switch } from '@headlessui/react'
 import { LoaderCircle, Save } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
 import {
   ApiError,
   type Car,
@@ -10,6 +9,8 @@ import {
   type CarInput,
   carFuels,
 } from '#/api/client'
+import { InputSuffix } from '#/components/input-suffix'
+import { useUnitFormat } from '#/lib/display-units'
 
 type Values = {
   type: string
@@ -144,6 +145,7 @@ export function CarForm({
   attachments,
 }: CarFormProps) {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const [values, setValues] = useState(() => initialValues(car))
   const [localReasons, setLocalReasons] = useState<Record<string, string>>({})
 
@@ -207,9 +209,13 @@ export function CarForm({
           }
           const id = `car-${name}`
           const invalid = invalidFields.includes(name)
+          // Only the purchase price is a decimal field; it is an amount.
+          const suffixId = kind === 'decimal' ? `${id}-unit` : undefined
           const hintId = hint ? `${id}-hint` : undefined
           const errorId = invalid ? `${id}-error` : undefined
-          const describedBy = [hintId, errorId].filter(Boolean).join(' ')
+          const describedBy = [suffixId, hintId, errorId]
+            .filter(Boolean)
+            .join(' ')
           const reason = reasons[name]
           const common = {
             id,
@@ -267,6 +273,11 @@ export function CarForm({
                     onChange={(event) => change(name, event.target.value)}
                   />
                 )}
+                {suffixId ? (
+                  <InputSuffix id={suffixId}>
+                    {units.currencySymbol}
+                  </InputSuffix>
+                ) : null}
               </div>
               {hintId ? (
                 <p className="field-hint" id={hintId}>

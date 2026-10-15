@@ -9,7 +9,7 @@ import (
 	"at.draab/my-car/internal/db"
 )
 
-func TestStoreUpdateAccountNames(t *testing.T) {
+func TestStoreUpdateProfile(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
 		t.Skip("DATABASE_URL not set; skipping Postgres integration test")
@@ -43,20 +43,29 @@ func TestStoreUpdateAccountNames(t *testing.T) {
 	s := NewStore(pool)
 
 	first := "Grace"
-	a, err := s.UpdateAccountNames(ctx, id, &first, nil)
+	a, err := s.UpdateProfile(ctx, id, Update{FirstName: &first})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.ID != id || a.Email != email || a.FirstName != "Grace" || a.LastName != "Lovelace" {
+	if a.ID != id || a.Email != email || a.FirstName != "Grace" || a.LastName != "Lovelace" || a.Currency != "EUR" || a.VolumeUnit != "liter" || a.DistanceUnit != "kilometer" {
 		t.Fatalf("partial update = %+v", a)
 	}
 
 	empty := ""
-	a, err = s.UpdateAccountNames(ctx, id, nil, &empty)
+	a, err = s.UpdateProfile(ctx, id, Update{LastName: &empty})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if a.FirstName != "Grace" || a.LastName != "" {
 		t.Fatalf("empty update = %+v", a)
+	}
+
+	usd, gallon, mile := "USD", "gallon", "mile"
+	a, err = s.UpdateProfile(ctx, id, Update{Currency: &usd, VolumeUnit: &gallon, DistanceUnit: &mile})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.FirstName != "Grace" || a.Currency != "USD" || a.VolumeUnit != "gallon" || a.DistanceUnit != "mile" {
+		t.Fatalf("settings update = %+v", a)
 	}
 }

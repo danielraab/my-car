@@ -18,7 +18,6 @@ import { useTranslation } from 'react-i18next'
 
 import { expenseKinds } from '#/api/client'
 import { isDeregistered } from '#/cars/deregistration'
-import { formatAmount } from '#/cars/format'
 import { allCarsQueryOptions } from '#/cars/queries'
 import { CarSelect } from '#/components/car-select'
 import { StackedBarChart } from '#/components/stacked-bar-chart'
@@ -29,6 +28,7 @@ import {
   validateDashboardSearch,
 } from '#/dashboard/search'
 import { yearToInstants } from '#/lib/date-range'
+import { useUnitFormat } from '#/lib/display-units'
 
 export const Route = createFileRoute('/_authenticated/home')({
   validateSearch: validateDashboardSearch,
@@ -47,6 +47,7 @@ function carIcon(type: string) {
 function DashboardPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
+  const units = useUnitFormat()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   // The current year is not written into the URL, so a link without a year
@@ -208,7 +209,7 @@ function DashboardPage() {
               label: t(`dashboard.series.${kind}`),
               values: months.map((month) => month[kind]),
             }))}
-            formatValue={(value) => formatAmount(value, locale)}
+            formatValue={(value) => units.money(value)}
             label={t('dashboard.chart', { year })}
             categoryLabel={t('dashboard.month')}
             totalLabel={t('dashboard.total')}

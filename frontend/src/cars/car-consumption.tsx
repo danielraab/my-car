@@ -3,6 +3,7 @@ import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { ExpenseFilter } from '#/api/client'
+import { useUnitFormat } from '#/lib/display-units'
 import { ConsumptionChart } from '#/refuels/consumption-chart'
 import { refuelChartQueryOptions } from '#/refuels/queries'
 
@@ -14,13 +15,17 @@ export function CarConsumption({
   filter: ExpenseFilter & { carId: string }
 }) {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const chart = useQuery(refuelChartQueryOptions(filter))
 
   return (
     <section className="chart-card" aria-labelledby="car-consumption-title">
       <h2 id="car-consumption-title">{t('cars.detail.consumption.title')}</h2>
       <p className="chart-description">
-        {t('cars.detail.consumption.description')}
+        {t('cars.detail.consumption.description', {
+          unit: units.consumptionSymbol,
+          odometer: units.odometerColumn,
+        })}
       </p>
       {chart.isPending ? (
         <output className="chart-status">

@@ -201,7 +201,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Updates the caller's first and/or last name. Names are trimmed and may be empty. The email address is read-only; a body containing `email` is rejected with `400` and a `read_only` reason for `email`, and nothing is applied. */
+        /** @description Updates the caller's first and/or last name and display settings (currency, volume unit, distance unit). Names are trimmed and may be empty. A currency that is not a known ISO 4217 code, or a unit outside its enum, is rejected with an `invalid_enum` reason. Changing a display setting only relabels values; no stored amount, volume or distance is converted. The email address is read-only; a body containing `email` is rejected with `400` and a `read_only` reason for `email`, and nothing is applied. */
         patch: operations["updateMe"];
         trace?: never;
     };
@@ -604,10 +604,31 @@ export interface components {
             email: string;
             firstName: string;
             lastName: string;
+            currency: components["schemas"]["Currency"];
+            volumeUnit: components["schemas"]["VolumeUnit"];
+            distanceUnit: components["schemas"]["DistanceUnit"];
         };
+        /**
+         * @description The account's currency as an ISO 4217 alphabetic code. It only labels amounts; stored amounts are never converted when it changes.
+         * @example EUR
+         */
+        Currency: string;
+        /**
+         * @description The unit the account's refuel volumes are recorded and shown in. It only labels values; stored volumes are never converted when it changes.
+         * @enum {string}
+         */
+        VolumeUnit: "liter" | "gallon";
+        /**
+         * @description The unit the account's odometer readings and distances are recorded and shown in. It only labels values; stored readings are never converted when it changes.
+         * @enum {string}
+         */
+        DistanceUnit: "kilometer" | "mile";
         ProfileUpdate: {
             firstName?: string;
             lastName?: string;
+            currency?: components["schemas"]["Currency"];
+            volumeUnit?: components["schemas"]["VolumeUnit"];
+            distanceUnit?: components["schemas"]["DistanceUnit"];
         };
         Session: {
             profile: components["schemas"]["Profile"];
@@ -753,9 +774,11 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             fuel: "normal" | "special" | "other";
+            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
             liters: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
         };
@@ -763,9 +786,11 @@ export interface components {
             /** Format: date-time */
             date?: string;
             station?: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             fuel?: "normal" | "special" | "other";
+            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
             liters?: components["schemas"]["Decimal"];
             amount?: components["schemas"]["Decimal"];
         };
@@ -777,13 +802,18 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading: number | null;
             /** @enum {string} */
             fuel: "normal" | "special" | "other";
+            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
             liters: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
+            /** @description Amount divided by `liters`: the price per unit of the account's volume unit, in the account's currency. */
             perLiter: components["schemas"]["Decimal"];
+            /** @description Distance since the car's previous refuel, in the account's distance unit. */
             distance: number | null;
+            /** @description Volume per 100 distance units, in the account's volume and distance units (for example l/100 km or gal/100 mi). */
             consumption: string | null;
         };
         RefuelPage: {
@@ -795,6 +825,7 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             type: "check" | "service" | "wearing_part" | "crash_repair";
@@ -805,6 +836,7 @@ export interface components {
             /** Format: date-time */
             date?: string;
             station?: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             type?: "check" | "service" | "wearing_part" | "crash_repair";
@@ -820,6 +852,7 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading: number | null;
             /** @enum {string} */
             type: "check" | "service" | "wearing_part" | "crash_repair";

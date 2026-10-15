@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Car, Refuel } from '#/api/client'
 import { i18n } from '#/i18n'
 import { dateRangeToInstants, defaultFrom } from '#/lib/date-range'
@@ -11,6 +11,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 const car: Car = {
   id: '22222222-2222-2222-2222-222222222222',
@@ -465,5 +468,48 @@ describe('refuel attachments', () => {
       await screen.findByText(/werden vor dem Hochladen verkleinert/),
     ).toBeInTheDocument()
     expect(screen.getByText('Anhänge')).toBeInTheDocument()
+  })
+})
+
+describe('refuels in another currency and units', () => {
+  beforeEach(() => {
+    Object.assign(profile, {
+      currency: 'USD',
+      volumeUnit: 'gallon',
+      distanceUnit: 'mile',
+    })
+  })
+  afterEach(() => {
+    Object.assign(profile, {
+      currency: 'EUR',
+      volumeUnit: 'liter',
+      distanceUnit: 'kilometer',
+    })
+  })
+
+  it('labels the list and chart with the account settings', async () => {
+    backend()
+    renderApp('/refuels')
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    expect(
+      within(table).getByRole('columnheader', { name: 'Gallons' }),
+    ).toBeInTheDocument()
+    expect(
+      within(table).getByRole('columnheader', { name: 'Per gallon' }),
+    ).toBeInTheDocument()
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent(/\$/)
+    expect(screen.getByText(/^Price per gallon over time/)).toBeInTheDocument()
+  })
+
+  it('shows the units next to the form inputs', async () => {
+    backend()
+    renderApp('/refuels/create')
+    expect(await screen.findByLabelText('Gallons')).toHaveAccessibleDescription(
+      /^gal/,
+    )
+    expect(screen.getByLabelText('Amount')).toHaveAccessibleDescription(/^\$/)
+    expect(
+      screen.getByRole('textbox', { name: /Odometer reading/ }),
+    ).toHaveAccessibleDescription('mi')
   })
 })

@@ -340,10 +340,14 @@ paths:
       tags:
       - Profile
       operationId: updateMe
-      description: Updates the caller's first and/or last name. Names are trimmed
-        and may be empty. The email address is read-only; a body containing
-        `email` is rejected with `400` and a `read_only` reason for `email`,
-        and nothing is applied.
+      description: Updates the caller's first and/or last name and display
+        settings (currency, volume unit, distance unit). Names are trimmed
+        and may be empty. A currency that is not a known ISO 4217 code, or a
+        unit outside its enum, is rejected with an `invalid_enum` reason.
+        Changing a display setting only relabels values; no stored amount,
+        volume or distance is converted. The email address is read-only; a
+        body containing `email` is rejected with `400` and a `read_only`
+        reason for `email`, and nothing is applied.
       requestBody:
         required: true
         content:
@@ -1570,6 +1574,9 @@ components:
       - email
       - firstName
       - lastName
+      - currency
+      - volumeUnit
+      - distanceUnit
       properties:
         id:
           $ref: '#/components/schemas/UUID'
@@ -1580,6 +1587,33 @@ components:
           type: string
         lastName:
           type: string
+        currency:
+          $ref: '#/components/schemas/Currency'
+        volumeUnit:
+          $ref: '#/components/schemas/VolumeUnit'
+        distanceUnit:
+          $ref: '#/components/schemas/DistanceUnit'
+    Currency:
+      type: string
+      pattern: ^[A-Z]{3}$
+      description: >-
+        The account's currency as an ISO 4217 alphabetic code. It only labels
+        amounts; stored amounts are never converted when it changes.
+      examples:
+      - EUR
+    VolumeUnit:
+      type: string
+      enum: [liter, gallon]
+      description: >-
+        The unit the account's refuel volumes are recorded and shown in. It
+        only labels values; stored volumes are never converted when it changes.
+    DistanceUnit:
+      type: string
+      enum: [kilometer, mile]
+      description: >-
+        The unit the account's odometer readings and distances are recorded
+        and shown in. It only labels values; stored readings are never
+        converted when it changes.
     ProfileUpdate:
       type: object
       minProperties: 1
@@ -1591,6 +1625,12 @@ components:
         lastName:
           type: string
           maxLength: 100
+        currency:
+          $ref: '#/components/schemas/Currency'
+        volumeUnit:
+          $ref: '#/components/schemas/VolumeUnit'
+        distanceUnit:
+          $ref: '#/components/schemas/DistanceUnit'
     Session:
       type: object
       required:
@@ -1962,6 +2002,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -1973,6 +2014,7 @@ components:
           - special
           - other
         liters:
+          description: "Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
@@ -1987,6 +2029,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -1998,6 +2041,7 @@ components:
           - special
           - other
         liters:
+          description: "Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
@@ -2032,6 +2076,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -2040,17 +2085,21 @@ components:
           type: string
           enum: [normal, special, other]
         liters:
+          description: "Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
         perLiter:
+          description: "Amount divided by `liters`: the price per unit of the account's volume unit, in the account's currency."
           $ref: '#/components/schemas/Decimal'
         distance:
+          description: "Distance since the car's previous refuel, in the account's distance unit."
           type:
           - integer
           - 'null'
           minimum: 0
         consumption:
+          description: "Volume per 100 distance units, in the account's volume and distance units (for example l/100 km or gal/100 mi)."
           type:
           - string
           - 'null'
@@ -2083,6 +2132,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -2109,6 +2159,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -2154,6 +2205,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'

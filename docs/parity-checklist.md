@@ -348,6 +348,15 @@ own OpenSpec change, cited after the item.
   the `SCR-11` Details tab lists the car's files. Files are stored on the
   backend's filesystem or in S3 and are only served to the owning account.
   (`add-attachments`)
+- **ADD-05** — Currency and units. Each account has a currency (any ISO 4217
+  code, default EUR), a volume unit (litres or gallons, default litres) and
+  a distance unit (kilometres or miles, default kilometres), chosen on the
+  profile screen (`SCR-03`). Every amount, volume, odometer reading,
+  per-volume price (`DRV-01`) and consumption (`DRV-03`, shown as volume
+  per 100 distance units) on every screen is labelled with them, and amount,
+  volume and odometer inputs show them as a suffix. They are labels only:
+  changing one never converts a stored or derived value.
+  (`add-account-display-units`)
 
 ## Non-goals
 

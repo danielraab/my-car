@@ -524,6 +524,14 @@ select:focus-visible {
   outline: 0;
 }
 
+.input-suffix {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .field-error,
 .inline-error {
   margin: 0.55rem 0;
@@ -2170,4 +2178,26 @@ select:focus-visible {
     inset: 0;
     border-radius: 0;
   }
+}
+
+/* Profile: currency and units, set apart from the name fields. */
+.profile-units {
+  min-width: 0;
+  margin: 1.4rem 0 0;
+  padding: 1.2rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-units legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.3rem;
+  font-weight: 750;
+}
+
+.profile-units > .field-hint {
+  clear: both;
+  margin: 0 0 1rem;
 }

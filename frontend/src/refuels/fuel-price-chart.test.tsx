@@ -83,7 +83,7 @@ describe('FuelPriceChart', () => {
     await user.tab()
     await user.keyboard('{End}')
     expect(document.querySelector('.chart-popover')).toHaveTextContent(
-      'Mar 10, 2026Diesel · Premium1.749',
+      'Mar 10, 2026Diesel · Premium€1.749',
     )
   })
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Car, Refuel } from '#/api/client'
 import '#/i18n'
+import { DisplayUnitsContext } from '#/lib/display-units'
 import { renderInRouter } from '#/test/render-in-router'
 
 import { RefuelTable } from './refuel-table'
@@ -60,6 +61,33 @@ describe('RefuelTable', () => {
       '6',
     )
     expect(screen.getByText('8 l/100 km')).toBeInTheDocument()
+  })
+
+  it('labels values in the account currency and units without converting them', async () => {
+    await renderInRouter(
+      <DisplayUnitsContext.Provider
+        value={{ currency: 'USD', volumeUnit: 'gallon', distanceUnit: 'mile' }}
+      >
+        <RefuelTable
+          items={[refuel]}
+          derived={new Map([[refuel.id, { ...refuel, consumption: '7.12' }]])}
+          total={60}
+        />
+      </DisplayUnitsContext.Provider>,
+    )
+    expect(
+      await screen.findByRole('columnheader', { name: 'Gallons' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Per gallon' }),
+    ).toBeInTheDocument()
+    const row = screen.getAllByRole('row')[1]
+    expect(row).toHaveTextContent('1,500 mi')
+    expect(row).toHaveTextContent('40 gal')
+    expect(row).toHaveTextContent('$1.500')
+    expect(row).toHaveTextContent('$60.00')
+    expect(row).toHaveTextContent('7.12 gal/100 mi')
+    expect(screen.getAllByRole('row')[2]).toHaveTextContent('$60.00')
   })
 
   it('hides the car column and total when left out', async () => {

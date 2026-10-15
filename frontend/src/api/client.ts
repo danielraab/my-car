@@ -9,6 +9,8 @@ export type ApiErrorBody = components['schemas']['Error']
 export type Session = components['schemas']['Session']
 export type Profile = components['schemas']['Profile']
 export type ProfileUpdate = components['schemas']['ProfileUpdate']
+export type VolumeUnit = components['schemas']['VolumeUnit']
+export type DistanceUnit = components['schemas']['DistanceUnit']
 export type MagicLinkRequest = components['schemas']['MagicLinkRequest']
 export type AuthenticationMethods =
   components['schemas']['AuthenticationMethods']
@@ -82,6 +84,10 @@ export const ticketTypes: readonly TicketType[] = [
   'other',
 ]
 
+export const volumeUnits: readonly VolumeUnit[] = ['liter', 'gallon']
+
+export const distanceUnits: readonly DistanceUnit[] = ['kilometer', 'mile']
+
 export const carFuels: readonly CarFuel[] = [
   'gasoline',
   'diesel',
@@ -114,9 +120,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isProfile(value: unknown): value is Profile {
   if (!isRecord(value)) return false
-  const { id, email, firstName, lastName } = value
-  return [id, email, firstName, lastName].every(
-    (field) => typeof field === 'string',
+  const { id, email, firstName, lastName, currency } = value
+  return (
+    [id, email, firstName, lastName].every(
+      (field) => typeof field === 'string',
+    ) &&
+    typeof currency === 'string' &&
+    /^[A-Z]{3}$/.test(currency) &&
+    volumeUnits.some((unit) => unit === value.volumeUnit) &&
+    distanceUnits.some((unit) => unit === value.distanceUnit)
   )
 }
 

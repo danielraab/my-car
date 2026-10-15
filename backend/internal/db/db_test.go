@@ -69,8 +69,8 @@ func TestRunMigrations(t *testing.T) {
 	if err := sqlDB.QueryRow("SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("query schema_migrations: %v", err)
 	}
-	if version != 8 {
-		t.Errorf("schema_migrations.version = %d, want 8", version)
+	if version != 9 {
+		t.Errorf("schema_migrations.version = %d, want 9", version)
 	}
 	if dirty {
 		t.Errorf("schema_migrations.dirty = true, want false")
@@ -112,6 +112,7 @@ func TestDomainSchema(t *testing.T) {
 
 	assertSchemaObjects(t, sqlDB)
 	accountID := insertAccount(t, sqlDB, "driver@example.com")
+	assertAccountDisplaySettings(t, sqlDB, accountID)
 	assertRejected(t, sqlDB, "INSERT INTO oidc_login_attempts (state_digest, nonce, pkce_verifier, return_to, expires_at) VALUES (decode('00','hex'), 'nonce', 'verifier', '/', now() + interval '1 minute')")
 	assertRejected(t, sqlDB, "INSERT INTO magic_link_challenges (token_digest, email, return_to, expires_at) VALUES (decode('00','hex'), 'other@example.com', '/', now() + interval '1 minute')")
 	assertRejected(t, sqlDB, "INSERT INTO accounts (email) VALUES ('DRIVER@example.com')")
@@ -210,6 +211,27 @@ func insertAccount(t *testing.T, sqlDB *sql.DB, email string) string {
 		t.Fatalf("insert account: %v", err)
 	}
 	return id
+}
+
+func assertAccountDisplaySettings(t *testing.T, sqlDB *sql.DB, accountID string) {
+	t.Helper()
+	var currency, volumeUnit, distanceUnit string
+	if err := sqlDB.QueryRow("SELECT currency, volume_unit, distance_unit FROM accounts WHERE id = $1", accountID).Scan(&currency, &volumeUnit, &distanceUnit); err != nil {
+		t.Fatalf("read account display settings: %v", err)
+	}
+	if currency != "EUR" || volumeUnit != "liter" || distanceUnit != "kilometer" {
+		t.Errorf("display settings = %s/%s/%s, want EUR/liter/kilometer", currency, volumeUnit, distanceUnit)
+	}
+	if _, err := sqlDB.Exec("UPDATE accounts SET currency = 'USD', volume_unit = 'gallon', distance_unit = 'mile' WHERE id = $1", accountID); err != nil {
+		t.Errorf("set valid display settings: %v", err)
+	}
+	assertRejected(t, sqlDB, "UPDATE accounts SET currency = 'usd' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET currency = 'EURO' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET volume_unit = 'barrel' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET distance_unit = 'furlong' WHERE id = $1", accountID)
+	if _, err := sqlDB.Exec("UPDATE accounts SET currency = DEFAULT, volume_unit = DEFAULT, distance_unit = DEFAULT WHERE id = $1", accountID); err != nil {
+		t.Errorf("reset display settings: %v", err)
+	}
 }
 
 func insertCar(t *testing.T, sqlDB *sql.DB, accountID string) string {

@@ -10,6 +10,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 const laptop = {
   id: '3f2b8f0e-1a7c-4c55-9d43-0f6f3c7b9a11',

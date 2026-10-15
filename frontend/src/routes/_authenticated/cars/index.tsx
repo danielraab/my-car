@@ -6,8 +6,9 @@ import { useTranslation } from 'react-i18next'
 import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge } from '#/cars/car-state-badge'
 import { isCarMuted } from '#/cars/deregistration'
-import { formatAmount, formatDate } from '#/cars/format'
+import { formatDate } from '#/cars/format'
 import { carsListQueryOptions } from '#/cars/queries'
+import { useUnitFormat } from '#/lib/display-units'
 
 export const Route = createFileRoute('/_authenticated/cars/')({
   component: CarsPage,
@@ -16,6 +17,7 @@ export const Route = createFileRoute('/_authenticated/cars/')({
 function CarsPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
+  const units = useUnitFormat()
   const cars = useInfiniteQuery(carsListQueryOptions)
   const items = cars.data?.pages.flatMap((page) => page.items) ?? []
 
@@ -108,7 +110,7 @@ function CarsPage() {
                     <td className="numeric">
                       {car.purchasePrice === null
                         ? t('cars.notRecorded')
-                        : formatAmount(car.purchasePrice, locale)}
+                        : units.money(car.purchasePrice)}
                     </td>
                     <td className="attachment-cell">
                       <AttachmentIndicator

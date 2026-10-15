@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { useMemo } from 'react'
 import { validReturnTo } from '#/auth/return-to'
 import { sessionQueryKey, sessionQueryOptions } from '#/auth/session'
 import { AppShell } from '#/components/app-shell'
 import { SessionUnavailable } from '#/components/session-unavailable'
+import { DisplayUnitsContext, displayUnitsOf } from '#/lib/display-units'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ context, location }) => {
@@ -26,7 +28,17 @@ function AuthenticatedLayout() {
   // Follow the cached session so profile edits reach the shell without a
   // reload; the route context value covers the moment before it is cached.
   const { data } = useQuery(sessionQueryOptions)
-  return <AppShell session={data ?? resolved} />
+  const session = data ?? resolved
+  const { currency, volumeUnit, distanceUnit } = session.profile
+  const units = useMemo(
+    () => displayUnitsOf({ currency, volumeUnit, distanceUnit }),
+    [currency, volumeUnit, distanceUnit],
+  )
+  return (
+    <DisplayUnitsContext.Provider value={units}>
+      <AppShell session={session} />
+    </DisplayUnitsContext.Provider>
+  )
 }
 
 function SessionError({ reset }: { reset: () => void }) {

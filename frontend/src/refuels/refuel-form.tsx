@@ -10,6 +10,8 @@ import {
   type RefuelInput,
   refuelFuels,
 } from '#/api/client'
+import { InputSuffix } from '#/components/input-suffix'
+import { useUnitFormat } from '#/lib/display-units'
 import { fromLocalInput, toLocalInput } from '#/repairs/format'
 
 type Values = {
@@ -102,6 +104,7 @@ export function RefuelForm({
   attachments,
 }: RefuelFormProps) {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const [values, setValues] = useState(() =>
     initialValues(refuel, initialCarId),
   )
@@ -147,18 +150,25 @@ export function RefuelForm({
       'aria-invalid': boolean
       'aria-describedby': string | undefined
     }) => ReactNode,
-    options: { optional?: boolean; hint?: boolean } = {},
+    options: {
+      optional?: boolean
+      hint?: boolean
+      label?: string
+      suffix?: string
+    } = {},
   ) {
     const id = `refuel-${name}`
     const invalid = invalidFields.includes(name)
+    const suffixId = options.suffix ? `${id}-unit` : undefined
     const hintId = options.hint ? `${id}-hint` : undefined
     const errorId = invalid ? `${id}-error` : undefined
-    const describedBy = [hintId, errorId].filter(Boolean).join(' ')
+    const describedBy = [suffixId, hintId, errorId].filter(Boolean).join(' ')
     const reason = reasons[name]
     return (
       <div className="form-field">
         <label htmlFor={id}>
-          {t(`refuels.fields.${name === 'carId' ? 'car' : name}`)}
+          {options.label ??
+            t(`refuels.fields.${name === 'carId' ? 'car' : name}`)}
           {options.optional ? (
             <span className="field-optional"> ({t('refuels.optional')})</span>
           ) : null}
@@ -170,6 +180,9 @@ export function RefuelForm({
             'aria-invalid': invalid,
             'aria-describedby': describedBy || undefined,
           })}
+          {suffixId && options.suffix ? (
+            <InputSuffix id={suffixId}>{options.suffix}</InputSuffix>
+          ) : null}
         </div>
         {hintId ? (
           <p className="field-hint" id={hintId}>
@@ -253,7 +266,11 @@ export function RefuelForm({
               }
             />
           ),
-          { optional: true },
+          {
+            optional: true,
+            label: units.odometerReadingName,
+            suffix: units.distanceSymbol,
+          },
         )}
         {field('fuel', (common) => (
           <select
@@ -281,7 +298,7 @@ export function RefuelForm({
               onChange={(event) => change('liters', event.target.value)}
             />
           ),
-          { hint: true },
+          { hint: true, label: units.volumeName, suffix: units.volumeSymbol },
         )}
         {field(
           'amount',
@@ -296,7 +313,7 @@ export function RefuelForm({
               onChange={(event) => change('amount', event.target.value)}
             />
           ),
-          { hint: true },
+          { hint: true, suffix: units.currencySymbol },
         )}
       </div>
 

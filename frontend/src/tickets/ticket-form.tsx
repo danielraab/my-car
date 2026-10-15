@@ -1,7 +1,6 @@
 import { LoaderCircle, Save } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
 import {
   ApiError,
   type Car,
@@ -10,6 +9,8 @@ import {
   type TicketType,
   ticketTypes,
 } from '#/api/client'
+import { InputSuffix } from '#/components/input-suffix'
+import { useUnitFormat } from '#/lib/display-units'
 import { fromLocalInput, toLocalInput } from '#/repairs/format'
 
 type Values = {
@@ -89,6 +90,7 @@ export function TicketForm({
   attachments,
 }: TicketFormProps) {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const [values, setValues] = useState(() =>
     initialValues(ticket, initialCarId),
   )
@@ -128,20 +130,28 @@ export function TicketForm({
       'aria-invalid': boolean
       'aria-describedby': string | undefined
     }) => ReactNode,
-    options: { optional?: boolean; hint?: boolean; wide?: boolean } = {},
+    options: {
+      optional?: boolean
+      hint?: boolean
+      wide?: boolean
+      label?: string
+      suffix?: string
+    } = {},
   ) {
     const id = `ticket-${name}`
     const invalid = invalidFields.includes(name)
+    const suffixId = options.suffix ? `${id}-unit` : undefined
     const hintId = options.hint ? `${id}-hint` : undefined
     const errorId = invalid ? `${id}-error` : undefined
-    const describedBy = [hintId, errorId].filter(Boolean).join(' ')
+    const describedBy = [suffixId, hintId, errorId].filter(Boolean).join(' ')
     const reason = reasons[name]
     return (
       <div
         className={options.wide ? 'form-field form-field-wide' : 'form-field'}
       >
         <label htmlFor={id}>
-          {t(`tickets.fields.${name === 'carId' ? 'car' : name}`)}
+          {options.label ??
+            t(`tickets.fields.${name === 'carId' ? 'car' : name}`)}
           {options.optional ? (
             <span className="field-optional"> ({t('tickets.optional')})</span>
           ) : null}
@@ -153,6 +163,9 @@ export function TicketForm({
             'aria-invalid': invalid,
             'aria-describedby': describedBy || undefined,
           })}
+          {suffixId && options.suffix ? (
+            <InputSuffix id={suffixId}>{options.suffix}</InputSuffix>
+          ) : null}
         </div>
         {hintId ? (
           <p className="field-hint" id={hintId}>
@@ -248,7 +261,7 @@ export function TicketForm({
               onChange={(event) => change('amount', event.target.value)}
             />
           ),
-          { hint: true },
+          { hint: true, suffix: units.currencySymbol },
         )}
         {field(
           'description',

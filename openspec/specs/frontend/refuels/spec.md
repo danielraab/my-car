@@ -6,7 +6,7 @@ Defines authenticated, localized refuel management and fuel-price views.
 ## Requirements
 
 ### Requirement: Refuels list is filterable, paginated, and charted
-The frontend SHALL render `/refuels` in the authenticated shell with a paginated table of the caller's refuels showing the date (without time of day), car, station, odometer reading, litres, per-litre price, amount, and consumption when available. It SHALL provide a localized caller-car filter and a localized date-range control with a "from" date and an optional "to" date, and SHALL apply both to the collection and chart queries. It SHALL show a fuel-price chart from the complete chart series for the selected car and range rather than from table pages, and a running amount total for loaded table rows. The screen SHALL provide localized loading, retryable-error, empty, load-more, edit, and create states.
+The frontend SHALL render `/refuels` in the authenticated shell with a paginated table of the caller's refuels showing the date (without time of day), car, station, odometer reading, volume, per-volume price, amount, and consumption when available, labelled in the account's currency and units as defined by `frontend/display-units`. It SHALL provide a localized caller-car filter and a localized date-range control with a "from" date and an optional "to" date, and SHALL apply both to the collection and chart queries. It SHALL show a fuel-price chart from the complete chart series for the selected car and range rather than from table pages, and a running amount total for loaded table rows. The screen SHALL provide localized loading, retryable-error, empty, load-more, edit, and create states.
 
 The car filter and range SHALL be reflected in the URL's `carId`, `from`, and `to` search parameters, with `from` and `to` as calendar dates (`YYYY-MM-DD`). When `carId` is absent or malformed, all of the caller's cars SHALL be shown. When `from` is absent, it SHALL default to the date six months before today in the user's local time zone; when `to` is absent, the range SHALL be open-ended. Both boundary days SHALL be included in full in the user's local time zone. A malformed `from` or `to` value SHALL be treated as absent. The range SHALL be applied by the backend queries, not by filtering already-loaded rows.
 
@@ -42,6 +42,10 @@ The car filter and range SHALL be reflected in the URL's `carId`, `from`, and `t
 - **WHEN** the collection or chart operation fails
 - **THEN** the screen shows a localized retryable error
 
+#### Scenario: Columns in gallons
+- **WHEN** the account volume unit is `gallon`
+- **THEN** the volume and per-volume price columns are headed in gallons rather than litres
+
 ### Requirement: Fuel-price chart draws one line per car fuel and refuel fuel
 The `/refuels` fuel-price chart SHALL draw one line for each pair of car fuel and refuel fuel that occurs in the chart series, where a refuel's car fuel is the current fuel of the car it belongs to. Pairs with no refuels SHALL NOT be drawn or listed in the legend. Each line SHALL be labelled in the legend and popover with the localized car fuel followed by the localized refuel fuel (for example "Diesel · Premium"). A line's hue SHALL be determined by the car fuel and its shade by the refuel fuel, with normal as the middle shade, premium as the darkest and other as the lightest; every car fuel, including electric, SHALL have a hue. A pair's colour SHALL NOT depend on which other pairs are present, the selected car, or the selected range, and every pair SHALL stay distinguishable from the others against the chart background. The chart SHALL be drawn only once both the chart series and the caller's cars have loaded, and SHALL show the localized retryable chart error if either fails.
 
@@ -74,7 +78,7 @@ The `/refuels` fuel-price chart SHALL draw one line for each pair of car fuel an
 - **THEN** the legend and popover use the German names of both fuels
 
 ### Requirement: User can create a refuel
-The frontend SHALL render `/refuels/create` with fields for car, date/time, station, optional odometer reading, fuel subtype, litres, and amount. It SHALL offer caller-owned cars, accept `carId` to preselect one, offer caller-owned station suggestions, and localize fuel choices. A valid submission SHALL create the refuel and navigate to the list; a field validation error SHALL remain on the form with its values preserved.
+The frontend SHALL render `/refuels/create` with fields for car, date/time, station, optional odometer reading, fuel subtype, volume, and amount, with the odometer, volume and amount fields showing the account's units as defined by `frontend/display-units`. It SHALL offer caller-owned cars, accept `carId` to preselect one, offer caller-owned station suggestions, and localize fuel choices. A valid submission SHALL create the refuel and navigate to the list; a field validation error SHALL remain on the form with its values preserved.
 
 #### Scenario: User creates from a car context
 - **WHEN** the user visits `/refuels/create?carId=<id>` for their car

@@ -7,6 +7,7 @@ import { allCarsQueryOptions } from '#/cars/queries'
 import { CarSelect } from '#/components/car-select'
 import { DateRangeControl } from '#/components/date-range-control'
 import { dateRangeToInstants, defaultFrom } from '#/lib/date-range'
+import { useUnitFormat } from '#/lib/display-units'
 import { type ListSearch, validateListSearch } from '#/lib/list-search'
 import { FuelPriceChart } from '#/refuels/fuel-price-chart'
 import {
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/_authenticated/refuels/')({
 
 function RefuelsPage() {
   const { t } = useTranslation()
+  const units = useUnitFormat()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const carId = search.carId ?? ''
@@ -85,7 +87,9 @@ function RefuelsPage() {
 
       <section className="chart-card" aria-labelledby="refuels-chart-title">
         <h2 id="refuels-chart-title">{t('refuels.chart')}</h2>
-        <p className="chart-description">{t('refuels.chartDescription')}</p>
+        <p className="chart-description">
+          {t('refuels.chartDescription', { volume: units.volumeSingular })}
+        </p>
         {/* Each line is a car fuel and refuel fuel pair, so the chart
             needs the cars as well as its series. */}
         {chart.isError || cars.isError ? (

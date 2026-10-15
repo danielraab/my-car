@@ -11,6 +11,9 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 
 function response(status: number, body?: unknown) {
@@ -89,7 +92,7 @@ describe('profile screen', () => {
     ).toHaveValue('Ada')
   })
 
-  it('saves only name fields and updates the session profile', async () => {
+  it('saves names and settings, not the email, and updates the session profile', async () => {
     const saved = { ...profile, firstName: 'Grace' }
     const calls = backend({
       'GET /api/v1/me': () => response(200, profile),
@@ -110,6 +113,9 @@ describe('profile screen', () => {
     expect(JSON.parse(String(patch?.init?.body))).toEqual({
       firstName: 'Grace',
       lastName: 'Lovelace',
+      currency: 'EUR',
+      volumeUnit: 'liter',
+      distanceUnit: 'kilometer',
     })
     expect(firstName).toHaveValue('Grace')
     expect(
@@ -169,6 +175,133 @@ describe('profile screen', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
+  it('prefills the currency and units with a no-conversion hint', async () => {
+    backend({ 'GET /api/v1/me': () => response(200, profile) })
+    renderApp('/profile')
+
+    expect(
+      await screen.findByRole('combobox', { name: 'Currency' }),
+    ).toHaveValue('EUR')
+    expect(
+      screen.getByRole('option', { name: 'Euro (EUR)' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'US Dollar (USD)' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Volume' })).toHaveValue(
+      'liter',
+    )
+    expect(screen.getByRole('combobox', { name: 'Distance' })).toHaveValue(
+      'kilometer',
+    )
+    expect(
+      screen.getByRole('group', { name: 'Currency and units' }),
+    ).toHaveAccessibleDescription(/are not converted/)
+  })
+
+  it('saves new settings and relabels other screens without a reload', async () => {
+    const saved = {
+      ...profile,
+      currency: 'USD',
+      volumeUnit: 'gallon',
+      distanceUnit: 'mile',
+    }
+    const calls = backend({
+      'GET /api/v1/me': () => response(200, profile),
+      'PATCH /api/v1/me': () => response(200, saved),
+      'GET /api/v1/cars': () =>
+        response(200, {
+          items: [
+            {
+              id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
+              attachmentCount: 0,
+              type: 'Hatchback',
+              make: 'VW',
+              name: 'Golf',
+              fuel: 'diesel',
+              firstRegistration: null,
+              licensePlate: null,
+              fin: null,
+              isActive: true,
+              purchaseDate: null,
+              purchasePrice: '18500.50',
+              deregistrationDate: null,
+              information: null,
+              createdAt: '2026-09-27T10:00:00Z',
+              updatedAt: '2026-09-27T10:00:00Z',
+            },
+          ],
+          nextCursor: null,
+        }),
+    })
+    const user = userEvent.setup()
+    const { queryClient, router } = renderApp('/profile')
+
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Currency' }),
+      'USD',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Volume' }),
+      'gallon',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Distance' }),
+      'mile',
+    )
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Your profile has been saved.',
+    )
+    const patch = calls.find((call) => call.key === 'PATCH /api/v1/me')
+    expect(JSON.parse(String(patch?.init?.body))).toMatchObject({
+      currency: 'USD',
+      volumeUnit: 'gallon',
+      distanceUnit: 'mile',
+    })
+    expect(
+      queryClient.getQueryData<Session>(['session'])?.profile.currency,
+    ).toBe('USD')
+
+    await router.navigate({ to: '/cars' })
+    const table = await screen.findByRole(
+      'table',
+      { name: 'Your cars' },
+      { timeout: 5000 },
+    )
+    expect(table).toHaveTextContent('$18,500.50')
+    // The currency select lists every ISO 4217 code, which makes the user
+    // events in this test slower than the default timeout allows.
+  }, 20_000)
+
+  it('shows a backend currency rejection on the currency choice', async () => {
+    backend({
+      'GET /api/v1/me': () => response(200, profile),
+      'PATCH /api/v1/me': () =>
+        response(400, {
+          code: 'validation_failed',
+          message: 'request validation failed',
+          fields: { currency: 'invalid_enum' },
+        }),
+    })
+    const user = userEvent.setup()
+    renderApp('/profile')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Save changes' }),
+    )
+
+    expect(
+      await screen.findByText('Choose one of the offered values.'),
+    ).toHaveAttribute('id', 'currency-error')
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('follows a switch to German', async () => {
     backend({ 'GET /api/v1/me': () => response(200, profile) })
     const user = userEvent.setup()
@@ -193,5 +326,13 @@ describe('profile screen', () => {
     expect(
       screen.getByRole('button', { name: 'Änderungen speichern' }),
     ).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Währung' })).toHaveValue('EUR')
+    expect(
+      screen.getByRole('option', { name: 'Gallonen (gal)' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'Meilen (mi)' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/werden nicht umgerechnet/)).toBeInTheDocument()
   })
 })
