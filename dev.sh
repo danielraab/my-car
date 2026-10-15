@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Starts the local development stack: the compose "dev" profile (db, pgadmin,
-# mailpit), the Go backend on the host and the Vite dev server.
-# Ctrl+C stops backend and frontend; the containers keep running
-# (`docker compose --profile dev down` to stop them).
+# Starts the local development stack: the compose "dev" profile (db, pgadmin or dbgate, mailpit),
+# the Go backend on the host and the Vite dev server.
+# Ctrl+C (or either process exiting) stops backend, frontend and the containers
+# (stopped, not removed — `docker compose --profile dev down` to remove them).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,6 +30,8 @@ cleanup() {
     kill "$pid" 2>/dev/null || true
   done
   wait 2>/dev/null || true
+  echo "Stopping containers..."
+  docker compose -f "$ROOT/docker-compose.yml" --profile dev stop || true
 }
 trap cleanup INT TERM EXIT
 

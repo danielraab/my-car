@@ -133,7 +133,8 @@ The database it will talk to comes from compose:
 docker compose up -d db      # Postgres on localhost:5432
 ```
 
-Add `--profile dev` for pgadmin (`localhost:8081`) and Mailpit
+Add `--profile dev` for pgadmin (`localhost:8081`) or DbGate (`localhost:8082`,
+with the `mycars` connection preconfigured) and Mailpit
 (`localhost:8025`) alongside it. Mailpit accepts the `.env.example` SMTP
 settings and displays delivered magic links in its web UI.
 

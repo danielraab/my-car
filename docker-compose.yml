@@ -64,19 +64,42 @@ services:
 
 
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   profiles:
+  #     - "dev"
+  #     - "dev-only"
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@example.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #     PGADMIN_CONFIG_SERVER_MODE: "False"
+  #   ports:
+  #     - "8081:80" # web UI (8080 on the host is the app's port)
+  #   volumes:
+  #     - pgadmin-dev:/var/lib/pgadmin
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+  dbgate:
+    image: dbgate/dbgate:latest
     profiles:
       - "dev"
       - "dev-only"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: "False"
+      # Preconfigured connection to the compose database.
+      CONNECTIONS: mycars
+      LABEL_mycars: my-cars (local)
+      ENGINE_mycars: postgres@dbgate-plugin-postgres
+      SERVER_mycars: db
+      PORT_mycars: "5432"
+      USER_mycars: mycars
+      PASSWORD_mycars: mycars
+      DATABASE_mycars: mycars
     ports:
-      - "8081:80" # web UI (8080 on the host is the app's port)
+      - "8082:3000" # web UI (3000 on the host is the Vite dev server)
     volumes:
-      - pgadmin-dev:/var/lib/pgadmin
+      - dbgate-dev:/root/.dbgate
     depends_on:
       db:
         condition: service_healthy
@@ -107,4 +130,6 @@ services:
 volumes:
   pgdata:
   pgadmin-dev:
+  dbgate-dev:
+  cloudbeaver-dev:
   mailpit-dev:
