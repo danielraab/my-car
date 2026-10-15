@@ -76,9 +76,6 @@ services:
       db:
         condition: service_healthy
 
-
-
-
   # pgadmin:
   #   image: dpage/pgadmin4:latest
   #   profiles:
@@ -173,5 +170,4 @@ volumes:
   minio-dev:
   pgadmin-dev:
   dbgate-dev:
-  cloudbeaver-dev:
   mailpit-dev:
