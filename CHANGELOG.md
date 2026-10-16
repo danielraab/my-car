@@ -7,6 +7,57 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-16
+
+### Added
+
+- **Display settings**: each account has a currency (any ISO 4217 code,
+  default `EUR`), a volume unit (`liter` or `gallon`, default `liter`) and a
+  distance unit (`kilometer` or `mile`, default `kilometer`), editable on the
+  profile screen and applied everywhere without a reload. The settings are
+  labels only: stored values are never converted. Every amount shows the
+  currency symbol, and volume, odometer, per-volume price and consumption
+  labels, cells, form inputs and chart texts use the configured units
+  (consumption reads e.g. "gal/100 mi"). `GET`/`PATCH /api/v1/me` carry
+  `currency`, `volumeUnit` and `distanceUnit`; invalid values are rejected
+  with `400`. Database migration `000009` adds the columns with defaults, so
+  existing accounts are unchanged.
+- **Electric car charging**: refuels of an electric car are charges measured
+  in kWh, with price per kWh and consumption in kWh/100 km (or mi). Other
+  cars keep the account volume unit. The refuel subtype gains the charging
+  values `home`, `ac` and `dc`; an electric car accepts `home`, `ac`, `dc`
+  and `other`, every other car `normal`, `special` and `other`, and a
+  mismatching subtype is rejected (`fuel_mismatch`). Forms only offer the
+  subtypes of the selected car.
+- **Fuel-price chart**: electric lines are plotted against a second value
+  axis on the right (price per kWh), shown only when electric lines are
+  present, in the teal hue with one shade per charging subtype.
+- Car representations gain `refuelCount`.
+- The legacy import maps refuels of legacy electric cars to the charging
+  subtypes, and the test-data seed includes an electric car with charges.
+
+### Changed
+
+- **BREAKING (API)**: the refuel member `liters` is renamed to `quantity` and
+  the derived `perLiter` to `unitPrice`, including in chart data. Database
+  migration `000010` renames the column `refuels.liters` to `quantity` and
+  adds the charging subtypes. The bundled frontend is updated; external API
+  clients have to adapt.
+- **BREAKING (API ordering)**: `GET /refuels`, `GET /repairs` and
+  `GET /tickets` return entries newest first (date descending, then ID
+  descending). The refuel, repair and ticket tables and the car Expenses tab
+  show the newest entry at the top, and "load more" appends older entries.
+  Cursors from the old ordering are not valid any more. Charts, statistics,
+  and the computed `distance` and `consumption` are unchanged.
+- Changing a car between electric and a non-electric fuel is rejected
+  (`fuel_locked`) while the car has refuels. The car edit form disables those
+  options and explains why, naming the number of refuels. Changes among
+  diesel, gasoline and other stay allowed.
+- On screens that mix cars (all refuels), the quantity, unit price and
+  consumption columns have neutral headers and show the unit in every cell.
+- Development: removed the unused `cloudbeaver-dev` volume from
+  `docker-compose.yml`.
+
 ## [2.3.0] - 2026-10-15
 
 ### Added
@@ -167,7 +218,8 @@ app is kept in `old/` as reference only.
   inventories every legacy screen, endpoint and derived value as the
   acceptance criterion for the rewrite.
 
-[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/danielraab/my-cars/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/danielraab/my-cars/releases/tag/v2.4.0
 [2.3.0]: https://github.com/danielraab/my-cars/releases/tag/v2.3.0
 [2.2.0]: https://github.com/danielraab/my-cars/releases/tag/v2.2.0
 [2.1.0]: https://github.com/danielraab/my-cars/releases/tag/v2.1.0
