@@ -69,7 +69,31 @@ export const expenseKinds: readonly ExpenseKind[] = [
   'repair',
   'ticket',
 ]
-export const refuelFuels: readonly RefuelFuel[] = ['normal', 'special', 'other']
+export const refuelFuels: readonly RefuelFuel[] = [
+  'normal',
+  'special',
+  'home',
+  'ac',
+  'dc',
+  'other',
+]
+
+// The refuel subtypes a car accepts: charging subtypes for an electric car,
+// fuel grades for every other car; `other` fits both. The backend rejects
+// any other combination with `fuel_mismatch`.
+const fuelGrades: readonly RefuelFuel[] = ['normal', 'special', 'other']
+const chargeTypes: readonly RefuelFuel[] = ['home', 'ac', 'dc', 'other']
+
+export function refuelFuelsFor(
+  carFuel: CarFuel | undefined,
+): readonly RefuelFuel[] {
+  return carFuel === 'electric' ? chargeTypes : fuelGrades
+}
+
+// The subtype preselected for a new refuel of a car with this fuel.
+export function defaultRefuelFuel(carFuel: CarFuel | undefined): RefuelFuel {
+  return carFuel === 'electric' ? 'ac' : 'normal'
+}
 
 export const repairTypes: readonly RepairType[] = [
   'check',
@@ -155,6 +179,7 @@ function isCar(value: unknown): value is Car {
     carFuels.some((fuel) => fuel === value.fuel) &&
     typeof value.isActive === 'boolean' &&
     isCount(value.attachmentCount) &&
+    isCount(value.refuelCount) &&
     [
       value.firstRegistration,
       value.licensePlate,
@@ -240,9 +265,9 @@ function isRefuel(value: unknown): value is Refuel {
       value.carId,
       value.date,
       value.station,
-      value.liters,
+      value.quantity,
       value.amount,
-      value.perLiter,
+      value.unitPrice,
     ].every((v) => typeof v === 'string') &&
     refuelFuels.some((fuel) => fuel === value.fuel) &&
     isCount(value.attachmentCount) &&

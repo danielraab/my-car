@@ -137,7 +137,7 @@ func TestStoreCreateGetDelete(t *testing.T) {
 	}
 
 	var refuelID string
-	if err := pool.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'Station', 'normal', 40, 60) RETURNING id`, c.ID).Scan(&refuelID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'normal', 40, 60) RETURNING id`, c.ID).Scan(&refuelID); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Delete(ctx, account, c.ID); err != nil {
@@ -268,5 +268,64 @@ func TestStoreDeregistrationAndInformation(t *testing.T) {
 	}
 	if _, err := s.Update(ctx, account, c.ID, Patch{DeregistrationDate: Nullable{Set: true, Value: ptr("2019-02-28")}}); !errors.Is(err, ErrDeregistrationBeforeFirstRegistration) {
 		t.Fatalf("update out of order err = %v", err)
+	}
+}
+
+func TestStoreFuelCannotCrossElectricWithRefuels(t *testing.T) {
+	s, pool := testStore(t)
+	ctx := context.Background()
+	account := testAccount(t, pool)
+	addRefuel := func(carID string) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, `INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'other', 40, 60)`, carID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	gasoline := validInput("Golf")
+	gasoline.Fuel = "gasoline"
+	withRefuels, err := s.Create(ctx, account, gasoline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addRefuel(withRefuels.ID)
+	addRefuel(withRefuels.ID)
+	if got, err := s.Get(ctx, account, withRefuels.ID); err != nil || got.RefuelCount != 2 {
+		t.Fatalf("refuelCount = %d, %v; want 2", got.RefuelCount, err)
+	}
+	if _, err := s.Update(ctx, account, withRefuels.ID, Patch{Fuel: ptr("electric")}); !errors.Is(err, ErrFuelLocked) {
+		t.Fatalf("gasoline→electric with refuels: err = %v, want ErrFuelLocked", err)
+	}
+	if got, _ := s.Get(ctx, account, withRefuels.ID); got.Fuel != "gasoline" {
+		t.Fatalf("fuel after rejected change = %s, want gasoline", got.Fuel)
+	}
+	if got, err := s.Update(ctx, account, withRefuels.ID, Patch{Fuel: ptr("diesel")}); err != nil || got.Fuel != "diesel" {
+		t.Fatalf("gasoline→diesel with refuels = %+v, %v", got, err)
+	}
+
+	electric := validInput("ID.3")
+	electric.Fuel = "electric"
+	charged, err := s.Create(ctx, account, electric)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addRefuel(charged.ID)
+	if _, err := s.Update(ctx, account, charged.ID, Patch{Fuel: ptr("diesel")}); !errors.Is(err, ErrFuelLocked) {
+		t.Fatalf("electric→diesel with refuels: err = %v, want ErrFuelLocked", err)
+	}
+	if got, err := s.Update(ctx, account, charged.ID, Patch{Fuel: ptr("electric"), Name: ptr("ID.4")}); err != nil || got.Name != "ID.4" {
+		t.Fatalf("unchanged electric fuel with new name = %+v, %v", got, err)
+	}
+
+	empty, err := s.Create(ctx, account, gasoline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Update(ctx, account, empty.ID, Patch{Fuel: ptr("electric")}); err != nil || got.Fuel != "electric" || got.RefuelCount != 0 {
+		t.Fatalf("gasoline→electric without refuels = %+v, %v", got, err)
+	}
+
+	if _, err := s.Update(ctx, testAccount(t, pool), charged.ID, Patch{Fuel: ptr("diesel")}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("foreign car fuel change: err = %v, want ErrNotFound", err)
 	}
 }

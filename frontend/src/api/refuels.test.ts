@@ -14,9 +14,9 @@ const item = {
   station: 'Fuel',
   odometerReading: null,
   fuel: 'normal',
-  liters: '40',
+  quantity: '40',
   amount: '60',
-  perLiter: '1.5',
+  unitPrice: '1.5',
   distance: null,
   consumption: null,
 }
@@ -38,7 +38,7 @@ describe('refuel client guards', () => {
       vi
         .fn()
         .mockResolvedValue(
-          ok({ items: [{ ...item, perLiter: 1.5 }], nextCursor: null }),
+          ok({ items: [{ ...item, unitPrice: 1.5 }], nextCursor: null }),
         ),
     )
     await expect(getRefuels()).rejects.toMatchObject({

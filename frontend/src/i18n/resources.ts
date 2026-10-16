@@ -19,8 +19,11 @@ export const resources = {
         volume: { liter: 'l', gallon: 'gal' },
         distance: { kilometer: 'km', mile: 'mi' },
         volumeName: { liter: 'Litres', gallon: 'Gallons' },
-        perVolume: { liter: 'Per litre', gallon: 'Per gallon' },
         volumeSingular: { liter: 'litre', gallon: 'gallon' },
+        // Electric cars record charges in kWh, whatever the volume unit.
+        energy: 'kWh',
+        energyName: 'Kilowatt-hours',
+        perUnit: '{{price}}/{{unit}}',
         odometerColumn: { kilometer: 'Odometer', mile: 'Odometer' },
         odometerReading: {
           kilometer: 'Odometer reading',
@@ -236,6 +239,10 @@ export const resources = {
           type: 'For example hatchback, estate or SUV.',
           purchasePrice: 'A number such as 18500.50.',
           isActive: 'Inactive cars are shown muted but stay selectable.',
+          fuelLocked_one:
+            'This car has {{count}} refuel, so its fuel cannot be switched to or from electric. Delete the refuel first to change it.',
+          fuelLocked_other:
+            'This car has {{count}} refuels, so its fuel cannot be switched to or from electric. Delete its refuels first to change it.',
           deregistrationDate:
             'From this day on, the car is no longer offered for new entries.',
         },
@@ -250,6 +257,8 @@ export const resources = {
           too_long: 'Enter at most 2000 characters.',
           before_first_registration:
             'The deregistration date cannot be before the first registration.',
+          fuel_locked:
+            'This car has refuels, so its fuel cannot be switched to or from electric.',
           invalid: 'Check this value.',
         },
         saveError: 'The car could not be saved. Please try again.',
@@ -313,13 +322,13 @@ export const resources = {
       refuels: {
         eyebrow: 'Fuel log',
         title: 'Refuels',
-        description: 'Fuel purchases across all your cars.',
+        description: 'Fuel purchases and charges across all your cars.',
         add: 'Add refuel',
         filter: 'Filter by car',
         allCars: 'All cars',
         chart: 'Fuel price history',
         chartDescription:
-          'Price per {{volume}} over time, one line per car fuel and fuel grade.',
+          'Price per {{volume}} (fuel) or per kWh (charging) over time, one line per car fuel and fuel grade or charging type.',
         chartEmpty: 'There are no refuels to chart yet.',
         consumptionChartEmpty:
           'Not enough refuels with odometer readings in this range.',
@@ -348,13 +357,23 @@ export const resources = {
           date: 'Date and time',
           station: 'Station',
           fuel: 'Fuel',
+          chargeType: 'Charging type',
+          quantity: 'Quantity',
+          unitPrice: 'Unit price',
           amount: 'Amount',
           consumption: 'Consumption',
         },
-        fuels: { normal: 'Normal', special: 'Premium', other: 'Other' },
+        fuels: {
+          normal: 'Normal',
+          special: 'Premium',
+          home: 'Home',
+          ac: 'AC',
+          dc: 'DC fast',
+          other: 'Other',
+        },
         hints: {
           station: 'Choose a station you used before or enter a new one.',
-          liters: 'A number such as 42.5.',
+          quantity: 'A number such as 42.5.',
           amount: 'A number such as 65.90.',
         },
         fieldErrors: {
@@ -365,13 +384,16 @@ export const resources = {
           invalid_decimal: 'Enter a number such as 42.5.',
           negative: 'Enter a value of zero or more.',
           non_positive: 'Enter a value greater than zero.',
+          fuel_mismatch:
+            "This type does not fit the car's fuel. Choose one of the options.",
           invalid: 'Check this value.',
         },
         saveError: 'The refuel could not be saved. Please try again.',
         create: {
           eyebrow: 'New refuel',
           title: 'Add a refuel',
-          description: 'Record a fuel purchase for one of your cars.',
+          description:
+            'Record a fuel purchase or a charge for one of your cars.',
           submit: 'Add refuel',
           submitting: 'Adding refuel…',
           cancel: 'Cancel',
@@ -684,8 +706,10 @@ export const resources = {
         volume: { liter: 'l', gallon: 'gal' },
         distance: { kilometer: 'km', mile: 'mi' },
         volumeName: { liter: 'Liter', gallon: 'Gallonen' },
-        perVolume: { liter: 'Pro Liter', gallon: 'Pro Gallone' },
         volumeSingular: { liter: 'Liter', gallon: 'Gallone' },
+        energy: 'kWh',
+        energyName: 'Kilowattstunden',
+        perUnit: '{{price}}/{{unit}}',
         odometerColumn: { kilometer: 'Kilometerstand', mile: 'Meilenstand' },
         odometerReading: { kilometer: 'Kilometerstand', mile: 'Meilenstand' },
       },
@@ -908,6 +932,10 @@ export const resources = {
           purchasePrice: 'Eine Zahl wie 18500,50.',
           isActive:
             'Inaktive Autos werden abgeblendet angezeigt, bleiben aber auswählbar.',
+          fuelLocked_one:
+            'Dieses Auto hat {{count}} Tankvorgang, daher kann der Kraftstoff nicht auf oder von Elektro umgestellt werden. Lösche zuerst den Tankvorgang, um ihn zu ändern.',
+          fuelLocked_other:
+            'Dieses Auto hat {{count}} Tankvorgänge, daher kann der Kraftstoff nicht auf oder von Elektro umgestellt werden. Lösche zuerst seine Tankvorgänge, um ihn zu ändern.',
           deregistrationDate:
             'Ab diesem Tag wird das Auto für neue Einträge nicht mehr angeboten.',
         },
@@ -922,6 +950,8 @@ export const resources = {
           too_long: 'Gib höchstens 2000 Zeichen ein.',
           before_first_registration:
             'Das Abmeldedatum darf nicht vor der Erstzulassung liegen.',
+          fuel_locked:
+            'Dieses Auto hat Tankvorgänge, daher kann der Kraftstoff nicht auf oder von Elektro umgestellt werden.',
           invalid: 'Bitte überprüfe diesen Wert.',
         },
         saveError:
@@ -989,13 +1019,13 @@ export const resources = {
       refuels: {
         eyebrow: 'Tankbuch',
         title: 'Tankvorgänge',
-        description: 'Tankvorgänge für alle deine Autos.',
+        description: 'Tank- und Ladevorgänge für alle deine Autos.',
         add: 'Tankvorgang hinzufügen',
         filter: 'Nach Auto filtern',
         allCars: 'Alle Autos',
         chart: 'Kraftstoffpreisverlauf',
         chartDescription:
-          'Preis pro {{volume}} im Zeitverlauf, eine Linie je Kraftstoff des Autos und getankter Sorte.',
+          'Preis pro {{volume}} (Kraftstoff) bzw. pro kWh (Laden) im Zeitverlauf, eine Linie je Kraftstoff des Autos und Sorte bzw. Ladeart.',
         chartEmpty: 'Es gibt noch keine Tankvorgänge für das Diagramm.',
         consumptionChartEmpty:
           'Nicht genug Tankvorgänge mit {{odometer}} in diesem Zeitraum.',
@@ -1029,14 +1059,24 @@ export const resources = {
           date: 'Datum und Uhrzeit',
           station: 'Tankstelle',
           fuel: 'Kraftstoff',
+          chargeType: 'Ladeart',
+          quantity: 'Menge',
+          unitPrice: 'Preis je Einheit',
           amount: 'Betrag',
           consumption: 'Verbrauch',
         },
-        fuels: { normal: 'Normal', special: 'Super', other: 'Sonstiges' },
+        fuels: {
+          normal: 'Normal',
+          special: 'Super',
+          home: 'Zuhause',
+          ac: 'AC',
+          dc: 'DC-Schnellladen',
+          other: 'Sonstiges',
+        },
         hints: {
           station:
             'Wähle eine Tankstelle, die du schon verwendet hast, oder gib eine neue ein.',
-          liters: 'Eine Zahl wie 42,5.',
+          quantity: 'Eine Zahl wie 42,5.',
           amount: 'Eine Zahl wie 65,90.',
         },
         fieldErrors: {
@@ -1047,6 +1087,8 @@ export const resources = {
           invalid_decimal: 'Gib eine Zahl wie 42,5 ein.',
           negative: 'Gib einen Wert von null oder mehr ein.',
           non_positive: 'Gib einen Wert größer als null ein.',
+          fuel_mismatch:
+            'Diese Art passt nicht zum Kraftstoff des Autos. Wähle eine der Optionen.',
           invalid: 'Bitte überprüfe diesen Wert.',
         },
         saveError:
@@ -1054,7 +1096,8 @@ export const resources = {
         create: {
           eyebrow: 'Neuer Tankvorgang',
           title: 'Tankvorgang hinzufügen',
-          description: 'Erfasse einen Tankvorgang für eines deiner Autos.',
+          description:
+            'Erfasse einen Tank- oder Ladevorgang für eines deiner Autos.',
           submit: 'Tankvorgang hinzufügen',
           submitting: 'Tankvorgang wird hinzugefügt…',
           cancel: 'Abbrechen',

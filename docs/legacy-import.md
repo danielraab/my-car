@@ -17,9 +17,9 @@ or non-finite legacy float values, and category values outside the mappings.
 | `Users.firstname` / `lastname` | `accounts.first_name` / `last_name` |
 | legacy numeric IDs | generated UUIDs, held in the importer's mapping state |
 | `Cars.carMake` | `cars.make` |
-| `Refuels.liter` | `refuels.liters` |
+| `Refuels.liter` | `refuels.quantity` |
 | `Others`, `Diesel`, `Gasoline`, `Electric` | `other`, `diesel`, `gasoline`, `electric` |
-| `Normal`, `Special`, `Others` | `normal`, `special`, `other` |
+| `Normal`, `Special`, `Others` | `normal`, `special`, `other` (`ac`, `dc`, `other` for refuels of an electric car) |
 | `Check`, `Service`, `Wearing part`, `Crash repair` | `check`, `service`, `wearing_part`, `crash_repair` |
 | `Parking`, `Velocity`, `Others` | `parking`, `velocity`, `other` |
 

@@ -63,6 +63,7 @@ const knownReasons = new Set([
   'invalid_type',
   'too_long',
   'before_first_registration',
+  'fuel_locked',
 ])
 
 function initialValues(car?: Car): Values {
@@ -147,6 +148,11 @@ export function CarForm({
   const { t } = useTranslation()
   const units = useUnitFormat()
   const [values, setValues] = useState(() => initialValues(car))
+  // A car with refuels cannot switch to or from electric: its refuels'
+  // units and subtypes follow the fuel. The backend enforces this too.
+  const refuelCount = car?.refuelCount ?? 0
+  const fuelLocked = (fuel: CarFuel) =>
+    refuelCount > 0 && (fuel === 'electric') !== (car?.fuel === 'electric')
   const [localReasons, setLocalReasons] = useState<Record<string, string>>({})
 
   const reasons = {
@@ -212,8 +218,10 @@ export function CarForm({
           // Only the purchase price is a decimal field; it is an amount.
           const suffixId = kind === 'decimal' ? `${id}-unit` : undefined
           const hintId = hint ? `${id}-hint` : undefined
+          const lockId =
+            kind === 'select' && refuelCount > 0 ? `${id}-locked` : undefined
           const errorId = invalid ? `${id}-error` : undefined
-          const describedBy = [suffixId, hintId, errorId]
+          const describedBy = [suffixId, hintId, lockId, errorId]
             .filter(Boolean)
             .join(' ')
           const reason = reasons[name]
@@ -250,7 +258,11 @@ export function CarForm({
                     }}
                   >
                     {carFuels.map((fuel) => (
-                      <option key={fuel} value={fuel}>
+                      <option
+                        key={fuel}
+                        value={fuel}
+                        disabled={fuelLocked(fuel)}
+                      >
                         {t(`cars.fuels.${fuel}`)}
                       </option>
                     ))}
@@ -282,6 +294,11 @@ export function CarForm({
               {hintId ? (
                 <p className="field-hint" id={hintId}>
                   {t(`cars.hints.${name}`)}
+                </p>
+              ) : null}
+              {lockId ? (
+                <p className="field-hint" id={lockId}>
+                  {t('cars.hints.fuelLocked', { count: refuelCount })}
                 </p>
               ) : null}
               {errorId ? (

@@ -52,10 +52,12 @@ instead of substituting a value:
   `00:00:00`. A missing active flag becomes `true`. A purchase price that is
   missing or `0` becomes `null`, and a negative one is a problem.
 - Refuels → refuels of the car mapped from `CarId` (missing or unknown is a
-  problem). Station is required and must not be blank. Fuel maps
-  `Normal`→`normal`, `Special`→`special`, `Others`→`other`. Litres must be
-  present and greater than zero. Amount must be present and non-negative. A
-  missing odometer reading stays absent.
+  problem). Station is required and must not be blank. For a car whose
+  mapped fuel is not `electric`, fuel maps `Normal`→`normal`,
+  `Special`→`special`, `Others`→`other`; for an electric car, fuel maps
+  `Normal`→`ac`, `Special`→`dc`, `Others`→`other`. Litres must be present
+  and greater than zero and become the quantity. Amount must be present and
+  non-negative. A missing odometer reading stays absent.
 - Repairs → repairs of the mapped car. Station is required and must not be
   blank. Type maps `Check`→`check`, `Service`→`service`,
   `Wearing part`→`wearing_part`, `Crash repair`→`crash_repair`. Amount must
@@ -75,6 +77,12 @@ preserved on every imported row.
 - **WHEN** a refuel row has fuel `Premium`
 - **THEN** the row is reported as a problem naming the table, legacy id,
   column and value, and nothing is imported
+
+#### Scenario: Refuel of a legacy electric car
+- **WHEN** a refuel row with fuel `Special` belongs to a car with fuel
+  `Electric`
+- **THEN** it is imported with subtype `dc`, and its litres value becomes its
+  quantity
 
 #### Scenario: Car without registration details
 - **WHEN** a car row has no first registration and no license plate

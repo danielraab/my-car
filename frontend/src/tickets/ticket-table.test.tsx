@@ -10,6 +10,7 @@ import { TicketTable } from './ticket-table'
 const golf: Car = {
   id: '22222222-2222-2222-2222-222222222222',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',

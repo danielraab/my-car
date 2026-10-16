@@ -357,6 +357,18 @@ own OpenSpec change, cited after the item.
   volume and odometer inputs show them as a suffix. They are labels only:
   changing one never converts a stored or derived value.
   (`add-account-display-units`)
+- **ADD-06** — Electric cars. A refuel of an electric car is a charge: its
+  quantity is in kWh (whatever the account volume unit), its unit price
+  (`DRV-01`) per kWh and its consumption (`DRV-03`) in kWh per 100 distance
+  units, computed per charge like a refuel. Charges use their own subtypes —
+  home, AC, DC fast — and share "other" with fuel; the backend rejects a
+  subtype that does not fit the car's fuel. The refuel list (`SCR-13`, and
+  the `SCR-11` Expenses tab) heads quantity, unit price and consumption
+  without a unit and labels every cell in its car's unit; the fuel-price
+  chart (`SCR-13`) plots charge prices against a second, per-kWh axis. A
+  car's fuel cannot be switched to or from electric while it has refuels
+  (`SCR-12` explains why). The API member `liters` is renamed `quantity` and
+  `perLiter` `unitPrice`. (`add-electric-car-charging`)
 
 ## Non-goals
 

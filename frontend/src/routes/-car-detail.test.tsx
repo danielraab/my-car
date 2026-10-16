@@ -28,6 +28,7 @@ const profile = {
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -52,9 +53,9 @@ const refuel: Refuel = {
   station: 'Shell Wien',
   odometerReading: 1500,
   fuel: 'normal',
-  liters: '40',
+  quantity: '40',
   amount: '60',
-  perLiter: '1.5',
+  unitPrice: '1.5',
   distance: 500,
   consumption: '8',
 }
@@ -476,6 +477,51 @@ describe('car detail consumption', () => {
     expect(
       await screen.findByRole('slider', { name: 'Consumption' }),
     ).toBeInTheDocument()
+  })
+
+  it('names kWh per 100 km for an electric car', async () => {
+    backend({
+      car: () => response(200, { ...golf, fuel: 'electric', refuelCount: 2 }),
+      chart: () =>
+        response(200, {
+          items: [
+            { ...earlier, fuel: 'home' },
+            { ...refuel, fuel: 'dc', consumption: '17.2' },
+          ],
+        }),
+    })
+    const user = userEvent.setup()
+    renderApp(`/cars/${golf.id}?tab=consumption`)
+
+    expect(
+      await screen.findByText(/^Consumption in kWh\/100 km over time/),
+    ).toBeInTheDocument()
+    const slider = await screen.findByRole('slider', { name: 'Consumption' })
+    slider.focus()
+    await user.keyboard('{End}')
+    await waitFor(() =>
+      expect(document.querySelector('.chart-popover')).toHaveTextContent(
+        '17.2 kWh/100 km',
+      ),
+    )
+  })
+
+  it('labels the expenses of an electric car in kWh', async () => {
+    backend({
+      car: () => response(200, { ...golf, fuel: 'electric', refuelCount: 1 }),
+      refuels: () =>
+        response(200, {
+          items: [{ ...refuel, fuel: 'ac', unitPrice: '0.45' }],
+          nextCursor: null,
+        }),
+    })
+    renderApp(`/cars/${golf.id}?tab=expenses`)
+
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    const row = within(table).getAllByRole('row')[1]
+    expect(row).toHaveTextContent('40 kWh')
+    expect(row).toHaveTextContent('€0.450/kWh')
+    expect(row).toHaveTextContent('8 kWh/100 km')
   })
 
   it('shows the empty state in German', async () => {

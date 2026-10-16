@@ -27,7 +27,7 @@ const (
 var (
 	uuidPattern    = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	decimalPattern = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)
-	fuelTypes      = map[string]bool{"normal": true, "special": true, "other": true}
+	fuelTypes      = map[string]bool{"normal": true, "special": true, "home": true, "ac": true, "dc": true, "other": true}
 )
 
 func isUUID(s string) bool { return uuidPattern.MatchString(s) }
@@ -88,9 +88,9 @@ type refuelBody struct {
 	Station         string  `json:"station"`
 	OdometerReading *int64  `json:"odometerReading"`
 	Fuel            string  `json:"fuel"`
-	Liters          string  `json:"liters"`
+	Quantity        string  `json:"quantity"`
 	Amount          string  `json:"amount"`
-	PerLiter        string  `json:"perLiter"`
+	UnitPrice       string  `json:"unitPrice"`
 	Distance        *int64  `json:"distance"`
 	Consumption     *string `json:"consumption"`
 	AttachmentCount int     `json:"attachmentCount"`
@@ -99,8 +99,8 @@ type refuelBody struct {
 func toBody(r Refuel) refuelBody {
 	return refuelBody{
 		ID: r.ID, CarID: r.CarID, Date: r.Date.UTC().Format(time.RFC3339Nano), Station: r.Station,
-		OdometerReading: r.OdometerReading, Fuel: r.Fuel, Liters: r.Liters, Amount: r.Amount,
-		PerLiter: ratio(r.Amount, r.Liters, 3), AttachmentCount: r.AttachmentCount,
+		OdometerReading: r.OdometerReading, Fuel: r.Fuel, Quantity: r.Quantity, Amount: r.Amount,
+		UnitPrice: ratio(r.Amount, r.Quantity, 3), AttachmentCount: r.AttachmentCount,
 	}
 }
 
@@ -111,9 +111,11 @@ func ratio(numerator, denominator string, places int) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
-func consumption(liters string, distance int64) string {
-	l, _ := strconv.ParseFloat(liters, 64)
-	v := math.Round(l/float64(distance)*10000) / 100
+// consumption is the quantity (litres, gallons or kWh) per 100 distance
+// units.
+func consumption(quantity string, distance int64) string {
+	q, _ := strconv.ParseFloat(quantity, 64)
+	v := math.Round(q/float64(distance)*10000) / 100
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
@@ -126,6 +128,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err error) {
 	if errors.Is(err, ErrNotFound) {
 		apierror.NotFound(w)
+		return
+	}
+	if errors.Is(err, ErrFuelMismatch) {
+		apierror.Validation(w, map[string]string{"fuel": apierror.ReasonFuelMismatch})
 		return
 	}
 	httpserver.Logger(r.Context()).Error("refuel failed", "op", op, "error", err)
@@ -242,7 +248,7 @@ func (h *Handler) chart(w http.ResponseWriter, r *http.Request, accountID string
 				distance := *item.OdometerReading - old
 				if distance > 0 {
 					body.Distance = &distance
-					c := consumption(item.Liters, distance)
+					c := consumption(item.Quantity, distance)
 					body.Consumption = &c
 				}
 			}
@@ -261,7 +267,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 		return
 	}
 	for key, missing := range map[string]bool{
-		"carId": carID == nil, "date": p.Date == nil, "station": p.Station == nil, "fuel": p.Fuel == nil, "liters": p.Liters == nil, "amount": p.Amount == nil,
+		"carId": carID == nil, "date": p.Date == nil, "station": p.Station == nil, "fuel": p.Fuel == nil, "quantity": p.Quantity == nil, "amount": p.Amount == nil,
 	} {
 		if _, reported := fields[key]; missing && !reported {
 			fields[key] = apierror.ReasonRequired
@@ -273,7 +279,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, accountID strin
 	}
 	in := Input{
 		CarID: *carID, Date: *p.Date, Station: *p.Station, OdometerReading: p.OdometerReading.Value,
-		Fuel: *p.Fuel, Liters: *p.Liters, Amount: *p.Amount,
+		Fuel: *p.Fuel, Quantity: *p.Quantity, Amount: *p.Amount,
 	}
 	created, err := h.store.Create(r.Context(), accountID, in)
 	if err != nil {
@@ -364,18 +370,18 @@ func decodeBody(w http.ResponseWriter, r *http.Request, create bool) (Patch, *st
 					p.Fuel = s
 				}
 			}
-		case "liters", "amount":
+		case "quantity", "amount":
 			if s := requiredString(key, value, fields); s != nil {
 				switch {
 				case !decimalPattern.MatchString(*s):
 					fields[key] = apierror.ReasonInvalidDecimal
 				case strings.HasPrefix(*s, "-") && strings.Trim((*s)[1:], "0.") != "":
 					fields[key] = apierror.ReasonNegative
-				case key == "liters" && strings.Trim(*s, "0.") == "":
+				case key == "quantity" && strings.Trim(*s, "0.") == "":
 					fields[key] = apierror.ReasonNonPositive
 				default:
-					if key == "liters" {
-						p.Liters = s
+					if key == "quantity" {
+						p.Quantity = s
 					} else {
 						p.Amount = s
 					}

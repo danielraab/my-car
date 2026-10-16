@@ -5,10 +5,11 @@ import { useTranslation } from 'react-i18next'
 import {
   ApiError,
   type Car,
+  defaultRefuelFuel,
   type Refuel,
   type RefuelFuel,
   type RefuelInput,
-  refuelFuels,
+  refuelFuelsFor,
 } from '#/api/client'
 import { InputSuffix } from '#/components/input-suffix'
 import { useUnitFormat } from '#/lib/display-units'
@@ -20,7 +21,7 @@ type Values = {
   station: string
   odometerReading: string
   fuel: RefuelFuel
-  liters: string
+  quantity: string
   amount: string
 }
 
@@ -32,7 +33,7 @@ const fieldNames: FieldName[] = [
   'station',
   'odometerReading',
   'fuel',
-  'liters',
+  'quantity',
   'amount',
 ]
 
@@ -44,17 +45,23 @@ const knownReasons = new Set([
   'negative',
   'non_positive',
   'invalid_type',
+  'fuel_mismatch',
 ])
 
-function initialValues(refuel: Refuel | undefined, carId: string): Values {
+function initialValues(
+  refuel: Refuel | undefined,
+  carId: string,
+  cars: Car[],
+): Values {
+  const carFuel = cars.find((car) => car.id === carId)?.fuel
   return {
     carId: refuel?.carId ?? carId,
     date: toLocalInput(refuel ? new Date(refuel.date) : new Date()),
     station: refuel?.station ?? '',
     odometerReading:
       refuel?.odometerReading == null ? '' : String(refuel.odometerReading),
-    fuel: refuel?.fuel ?? refuelFuels[0],
-    liters: refuel?.liters ?? '',
+    fuel: refuel?.fuel ?? defaultRefuelFuel(carFuel),
+    quantity: refuel?.quantity ?? '',
     amount: refuel?.amount ?? '',
   }
 }
@@ -106,8 +113,12 @@ export function RefuelForm({
   const { t } = useTranslation()
   const units = useUnitFormat()
   const [values, setValues] = useState(() =>
-    initialValues(refuel, initialCarId),
+    initialValues(refuel, initialCarId, cars),
   )
+  // The selected car's fuel decides the quantity unit and which subtypes
+  // the backend accepts.
+  const carFuel = cars.find((car) => car.id === values.carId)?.fuel
+  const quantityUnits = units.quantity(carFuel)
   const [localReasons, setLocalReasons] = useState<Record<string, string>>({})
 
   const serverReasons =
@@ -124,6 +135,21 @@ export function RefuelForm({
     onEdit()
   }
 
+  // Switching to a car whose subtypes do not include the chosen one resets
+  // it to that car's default; `other` fits every car and is kept.
+  function changeCar(carId: string) {
+    const fuel = cars.find((car) => car.id === carId)?.fuel
+    setValues((current) => ({
+      ...current,
+      carId,
+      fuel: refuelFuelsFor(fuel).includes(current.fuel)
+        ? current.fuel
+        : defaultRefuelFuel(fuel),
+    }))
+    setLocalReasons(({ carId: _, fuel: __, ...rest }) => rest)
+    onEdit()
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const odometerReading = odometer(values.odometerReading)
@@ -137,7 +163,7 @@ export function RefuelForm({
       station: values.station,
       odometerReading,
       fuel: values.fuel,
-      liters: decimal(values.liters),
+      quantity: decimal(values.quantity),
       amount: decimal(values.amount),
     })
   }
@@ -209,7 +235,7 @@ export function RefuelForm({
             disabled={refuel !== undefined}
             required
             value={values.carId}
-            onChange={(event) => change('carId', event.target.value)}
+            onChange={(event) => changeCar(event.target.value)}
           >
             {values.carId === '' ? (
               <option value="">{t('refuels.chooseCar')}</option>
@@ -272,21 +298,30 @@ export function RefuelForm({
             suffix: units.distanceSymbol,
           },
         )}
-        {field('fuel', (common) => (
-          <select
-            {...common}
-            value={values.fuel}
-            onChange={(event) => change('fuel', event.target.value)}
-          >
-            {refuelFuels.map((fuel) => (
-              <option key={fuel} value={fuel}>
-                {t(`refuels.fuels.${fuel}`)}
-              </option>
-            ))}
-          </select>
-        ))}
         {field(
-          'liters',
+          'fuel',
+          (common) => (
+            <select
+              {...common}
+              value={values.fuel}
+              onChange={(event) => change('fuel', event.target.value)}
+            >
+              {refuelFuelsFor(carFuel).map((fuel) => (
+                <option key={fuel} value={fuel}>
+                  {t(`refuels.fuels.${fuel}`)}
+                </option>
+              ))}
+            </select>
+          ),
+          {
+            label:
+              carFuel === 'electric'
+                ? t('refuels.fields.chargeType')
+                : t('refuels.fields.fuel'),
+          },
+        )}
+        {field(
+          'quantity',
           (common) => (
             <input
               {...common}
@@ -294,11 +329,15 @@ export function RefuelForm({
               inputMode="decimal"
               required
               type="text"
-              value={values.liters}
-              onChange={(event) => change('liters', event.target.value)}
+              value={values.quantity}
+              onChange={(event) => change('quantity', event.target.value)}
             />
           ),
-          { hint: true, label: units.volumeName, suffix: units.volumeSymbol },
+          {
+            hint: true,
+            label: quantityUnits.name,
+            suffix: quantityUnits.symbol,
+          },
         )}
         {field(
           'amount',

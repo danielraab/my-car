@@ -78,7 +78,7 @@ func ptr[T any](v T) *T { return &v }
 var base = time.Date(2026, 1, 10, 9, 30, 0, 0, time.UTC)
 
 func validInput(carID string, day int, station string) Input {
-	return Input{CarID: carID, Date: base.AddDate(0, 0, day), Station: station, Fuel: "normal", Liters: "40", Amount: "120.50"}
+	return Input{CarID: carID, Date: base.AddDate(0, 0, day), Station: station, Fuel: "normal", Quantity: "40", Amount: "120.50"}
 }
 
 func TestStoreListPaginatesAndFilters(t *testing.T) {
@@ -162,12 +162,12 @@ func TestStoreCreateGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r.CarID != car || !r.Date.Equal(base) || r.Station != "Garage" || *r.OdometerReading != 123456 ||
-		r.Fuel != "normal" || r.Amount != "120.50" || r.Liters != "40" {
+		r.Fuel != "normal" || r.Amount != "120.50" || r.Quantity != "40" {
 		t.Fatalf("created = %+v", r)
 	}
 
 	bare, err := s.Create(ctx, account, validInput(car, 1, "Garage"))
-	if err != nil || bare.OdometerReading != nil || bare.Liters != "40" {
+	if err != nil || bare.OdometerReading != nil || bare.Quantity != "40" {
 		t.Fatalf("created without optionals = %+v, %v", bare, err)
 	}
 
@@ -209,17 +209,17 @@ func TestStoreUpdateTriState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Amount != "0" || updated.OdometerReading != nil || updated.Liters != "40" ||
+	if updated.Amount != "0" || updated.OdometerReading != nil || updated.Quantity != "40" ||
 		updated.Station != "Garage" || updated.Fuel != "normal" || !updated.Date.Equal(base) {
 		t.Fatalf("updated = %+v", updated)
 	}
 
 	updated, err = s.Update(ctx, account, r.ID, Patch{
-		Liters:          ptr("50"),
+		Quantity:        ptr("50"),
 		Fuel:            ptr("special"),
 		OdometerReading: NullableInt{Set: true, Value: ptr(int64(2000))},
 	})
-	if err != nil || updated.Liters != "50" || updated.Fuel != "special" || *updated.OdometerReading != 2000 {
+	if err != nil || updated.Quantity != "50" || updated.Fuel != "special" || *updated.OdometerReading != 2000 {
 		t.Fatalf("second update = %+v, %v", updated, err)
 	}
 
@@ -295,5 +295,61 @@ func TestStoreChartReturnsPredecessorsBeforeFrom(t *testing.T) {
 	_, previous, err = s.Chart(ctx, account, Filter{})
 	if err != nil || len(previous) != 0 {
 		t.Fatalf("unbounded previous = %v, %v", previous, err)
+	}
+}
+
+func TestStoreSubtypeMustFitCarFuel(t *testing.T) {
+	store, pool := testStore(t)
+	ctx := context.Background()
+	accountID, dieselID := testCar(t, pool)
+	var electricID string
+	if err := pool.QueryRow(ctx, `INSERT INTO cars (account_id, type, make, name, fuel, first_registration, license_plate)
+VALUES ($1, 'Hatchback', 'VW', 'ID.3', 'electric', '2022-01-01', 'W-3') RETURNING id`, accountID).Scan(&electricID); err != nil {
+		t.Fatal(err)
+	}
+
+	charge := validInput(electricID, 0, "Ionity")
+	charge.Fuel = "dc"
+	created, err := store.Create(ctx, accountID, charge)
+	if err != nil || created.Fuel != "dc" {
+		t.Fatalf("create dc charge = %+v, %v", created, err)
+	}
+	for _, fuel := range []string{"normal", "special"} {
+		bad := validInput(electricID, 1, "Shell")
+		bad.Fuel = fuel
+		if _, err := store.Create(ctx, accountID, bad); !errors.Is(err, ErrFuelMismatch) {
+			t.Errorf("create %s on electric car: err = %v, want ErrFuelMismatch", fuel, err)
+		}
+	}
+	for _, carID := range []string{electricID, dieselID} {
+		other := validInput(carID, 2, "Somewhere")
+		other.Fuel = "other"
+		if _, err := store.Create(ctx, accountID, other); err != nil {
+			t.Errorf("create other on %s: %v", carID, err)
+		}
+	}
+
+	refuel, err := store.Create(ctx, accountID, validInput(dieselID, 3, "OMV"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Update(ctx, accountID, refuel.ID, Patch{Fuel: ptr("home")}); !errors.Is(err, ErrFuelMismatch) {
+		t.Fatalf("update diesel refuel to home: err = %v, want ErrFuelMismatch", err)
+	}
+	unchanged, err := store.Get(ctx, accountID, refuel.ID)
+	if err != nil || unchanged.Fuel != "normal" {
+		t.Fatalf("refuel after rejected update = %+v, %v", unchanged, err)
+	}
+	if _, err := store.Update(ctx, accountID, created.ID, Patch{Fuel: ptr("ac")}); err != nil {
+		t.Fatalf("update charge to ac: %v", err)
+	}
+
+	// Another account's car or refuel is still reported as missing.
+	otherAccount, otherCar := testCar(t, pool)
+	if _, err := store.Create(ctx, accountID, validInput(otherCar, 4, "X")); !errors.Is(err, ErrNotFound) {
+		t.Errorf("create on foreign car: err = %v, want ErrNotFound", err)
+	}
+	if _, err := store.Update(ctx, otherAccount, refuel.ID, Patch{Fuel: ptr("special")}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("update foreign refuel: err = %v, want ErrNotFound", err)
 	}
 }

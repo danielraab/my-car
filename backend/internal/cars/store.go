@@ -15,6 +15,10 @@ import (
 // ErrNotFound reports a car that does not exist or belongs to another account.
 var ErrNotFound = errors.New("car not found")
 
+// ErrFuelLocked reports a fuel change to or from electric on a car that
+// has refuels; their subtypes and units would no longer fit the car.
+var ErrFuelLocked = errors.New("car fuel cannot cross the electric boundary while the car has refuels")
+
 // ErrDeregistrationBeforeFirstRegistration reports a write rejected by the
 // database because the deregistration date precedes the first registration.
 var ErrDeregistrationBeforeFirstRegistration = errors.New("deregistration date before first registration")
@@ -38,6 +42,7 @@ type Car struct {
 	DeregistrationDate *string
 	Information        *string
 	AttachmentCount    int
+	RefuelCount        int
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -96,11 +101,11 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, to_char(deregistration_date, 'YYYY-MM-DD'), information, (SELECT count(*) FROM attachments a WHERE a.car_id = cars.id), created_at, updated_at`
+const columns = `id, type, make, name, fuel::text, to_char(first_registration, 'YYYY-MM-DD'), license_plate, fin, is_active, to_char(purchase_date, 'YYYY-MM-DD'), purchase_price::text, to_char(deregistration_date, 'YYYY-MM-DD'), information, (SELECT count(*) FROM attachments a WHERE a.car_id = cars.id), (SELECT count(*) FROM refuels r WHERE r.car_id = cars.id), created_at, updated_at`
 
 func scanCar(row pgx.Row) (Car, error) {
 	var c Car
-	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.DeregistrationDate, &c.Information, &c.AttachmentCount, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Type, &c.Make, &c.Name, &c.Fuel, &c.FirstRegistration, &c.LicensePlate, &c.FIN, &c.IsActive, &c.PurchaseDate, &c.PurchasePrice, &c.DeregistrationDate, &c.Information, &c.AttachmentCount, &c.RefuelCount, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Car{}, ErrNotFound
 	}
@@ -157,9 +162,45 @@ func (s *Store) Get(ctx context.Context, accountID, carID string) (Car, error) {
 
 // Update applies a patch in one statement: COALESCE keeps non-nullable
 // columns that were not supplied, and CASE on each Set flag lets a nullable
-// column be cleared as well as kept or replaced.
+// column be cleared as well as kept or replaced. A fuel change to or from
+// electric is refused with ErrFuelLocked while the car has refuels; the car
+// row is locked first, so a refuel created concurrently (which share-locks
+// the car) is either seen by the check or validated against the new fuel.
 func (s *Store) Update(ctx context.Context, accountID, carID string, p Patch) (Car, error) {
-	return scanCar(s.pool.QueryRow(ctx, `UPDATE cars SET
+	if p.Fuel == nil {
+		return s.update(ctx, s.pool, accountID, carID, p)
+	}
+	var updated Car
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var stored string
+		var hasRefuels bool
+		if err := tx.QueryRow(ctx, `SELECT fuel::text FROM cars WHERE account_id = $1 AND id = $2 FOR UPDATE`, accountID, carID).Scan(&stored); errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if (stored == "electric") != (*p.Fuel == "electric") {
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM refuels WHERE car_id = $1)`, carID).Scan(&hasRefuels); err != nil {
+				return err
+			}
+			if hasRefuels {
+				return ErrFuelLocked
+			}
+		}
+		var err error
+		updated, err = s.update(ctx, tx, accountID, carID, p)
+		return err
+	})
+	return updated, err
+}
+
+// querier is satisfied by both the pool and a transaction.
+type querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func (s *Store) update(ctx context.Context, q querier, accountID, carID string, p Patch) (Car, error) {
+	return scanCar(q.QueryRow(ctx, `UPDATE cars SET
   type = COALESCE($3, type),
   make = COALESCE($4, make),
   name = COALESCE($5, name),

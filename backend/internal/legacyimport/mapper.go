@@ -54,9 +54,9 @@ type Car struct {
 }
 
 type Refuel struct {
-	ID, CarID, Station, Fuel, Liters, Amount string
-	Date                                     time.Time
-	OdometerReading                          *string
+	ID, CarID, Station, Fuel, Quantity, Amount string
+	Date                                       time.Time
+	OdometerReading                            *string
 	Stamps
 }
 
@@ -86,6 +86,9 @@ type Plan struct {
 var (
 	carFuels    = map[string]string{"Others": "other", "Diesel": "diesel", "Gasoline": "gasoline", "Electric": "electric"}
 	refuelFuels = map[string]string{"Normal": "normal", "Special": "special", "Others": "other"}
+	// The legacy app had no charging subtypes; refuels of an electric car
+	// map to the charging subtypes that must fit it.
+	chargeFuels = map[string]string{"Normal": "ac", "Special": "dc", "Others": "other"}
 	repairTypes = map[string]string{"Check": "check", "Service": "service", "Wearing part": "wearing_part", "Crash repair": "crash_repair"}
 	ticketTypes = map[string]string{"Parking": "parking", "Velocity": "velocity", "Others": "other"}
 
@@ -110,7 +113,7 @@ const legacyTimestamp = "2006-01-02 15:04:05"
 // every problem rather than stopping at the first; the plan is only
 // meaningful when there are none.
 func Map(d Dump) (Plan, []Problem) {
-	m := mapper{users: map[string]string{}, cars: map[string]string{}, emails: map[string]bool{}}
+	m := mapper{users: map[string]string{}, cars: map[string]string{}, electric: map[string]bool{}, emails: map[string]bool{}}
 	if d.TimeZone != "+00:00" {
 		m.problems = append(m.problems, Problem{Table: "dump", Reason: fmt.Sprintf("session time zone is %q, want \"+00:00\"", d.TimeZone)})
 	}
@@ -127,6 +130,7 @@ type mapper struct {
 	problems []Problem
 	users    map[string]string // legacy user id → account UUID
 	cars     map[string]string // legacy car id → car UUID
+	electric map[string]bool   // car UUID → whether the car is electric
 	emails   map[string]bool
 }
 
@@ -360,6 +364,7 @@ func (m *mapper) car(r *row) {
 		return
 	}
 	m.cars[r.id] = c.ID
+	m.electric[c.ID] = c.Fuel == "electric"
 	m.plan.Cars = append(m.plan.Cars, c)
 }
 
@@ -370,17 +375,21 @@ func (m *mapper) refuel(r *row) {
 		Date:            r.timestamp("date"),
 		Station:         r.requiredText("station"),
 		OdometerReading: r.odometer("odometerReading"),
-		Fuel:            r.category("fuel", refuelFuels),
 		Amount:          r.amount("amount"),
 		Stamps:          r.stamps(),
 	}
+	fuels := refuelFuels
+	if m.electric[f.CarID] {
+		fuels = chargeFuels
+	}
+	f.Fuel = r.category("fuel", fuels)
 	switch liters := r.decimal("liter"); {
 	case liters == nil && r.values["liter"].Null:
 		r.problem("liter", "required value is missing")
 	case liters != nil && (isNegative(*liters) || isZero(*liters)):
 		r.problem("liter", "not greater than zero")
 	case liters != nil:
-		f.Liters = *liters
+		f.Quantity = *liters
 	}
 	if !r.failed {
 		m.plan.Refuels = append(m.plan.Refuels, f)

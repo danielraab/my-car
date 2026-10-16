@@ -280,6 +280,7 @@ describe('cars API client', () => {
   const car = {
     id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
     attachmentCount: 0,
+    refuelCount: 0,
     type: 'Hatchback',
     make: 'VW',
     name: 'Golf',

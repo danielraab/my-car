@@ -71,7 +71,7 @@ VALUES ($1, 'Car', 'VW', 'Golf', 'diesel', '2019-03-01', 'W-1') RETURNING id`, a
 
 func addRefuel(t *testing.T, pool *pgxpool.Pool, carID string, date time.Time, amount string) {
 	t.Helper()
-	if _, err := pool.Exec(context.Background(), `INSERT INTO refuels (car_id, date, station, fuel, liters, amount)
+	if _, err := pool.Exec(context.Background(), `INSERT INTO refuels (car_id, date, station, fuel, quantity, amount)
 VALUES ($1, $2, 'Shell', 'normal', 40, $3)`, carID, date, amount); err != nil {
 		t.Fatal(err)
 	}

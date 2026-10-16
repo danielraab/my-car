@@ -16,9 +16,9 @@ const first: Refuel = {
   station: 'Fuel',
   odometerReading: 1000,
   fuel: 'normal',
-  liters: '40',
+  quantity: '40',
   amount: '60',
-  perLiter: '1.5',
+  unitPrice: '1.5',
   distance: null,
   consumption: null,
 }

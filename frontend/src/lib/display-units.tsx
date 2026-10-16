@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { Profile } from '#/api/client'
+import type { CarFuel, Profile } from '#/api/client'
 import { currencySymbol, formatDecimal, formatMoney } from '#/cars/format'
 
 // The account's display settings. They only label values: nothing stored or
@@ -41,20 +41,13 @@ export function useUnitFormat() {
   return useMemo(() => {
     const volume = t(`units.volume.${units.volumeUnit}`)
     const distance = t(`units.distance.${units.distanceUnit}`)
-    const consumption = t('units.consumption', { volume, distance })
     const withUnit = (value: string, unit: string) =>
       t('units.value', { value, unit })
     return {
       ...units,
       locale,
       currencySymbol: currencySymbol(locale, units.currency),
-      volumeSymbol: volume,
       distanceSymbol: distance,
-      consumptionSymbol: consumption,
-      // "Litres" / "Gallons", for column headers and field labels.
-      volumeName: t(`units.volumeName.${units.volumeUnit}`),
-      // "Per litre" / "Per gallon", for the per-volume price column.
-      perVolumeName: t(`units.perVolume.${units.volumeUnit}`),
       // "litre" / "gallon", inside running text.
       volumeSingular: t(`units.volumeSingular.${units.volumeUnit}`),
       // "Odometer" / "Kilometerstand" (German names the unit), for columns.
@@ -63,14 +56,37 @@ export function useUnitFormat() {
       odometerReadingName: t(`units.odometerReading.${units.distanceUnit}`),
       money: (value: string | number) =>
         formatMoney(value, locale, units.currency),
-      pricePerVolume: (value: string | number) =>
-        formatMoney(value, locale, units.currency, 3),
-      volume: (value: string | number) =>
-        withUnit(formatDecimal(value, locale, 2), volume),
       distance: (value: number) =>
         withUnit(new Intl.NumberFormat(locale).format(value), distance),
-      consumption: (value: string | number) =>
-        withUnit(formatDecimal(value, locale, 2), consumption),
+      // Units of a refuel's quantity, which follow its car's fuel: kWh for
+      // an electric car, the account volume unit otherwise. Every value is
+      // labelled with its unit, so rows of different cars can share a
+      // column.
+      quantity: (carFuel: CarFuel | undefined) => {
+        const electric = carFuel === 'electric'
+        const symbol = electric ? t('units.energy') : volume
+        const consumptionSymbol = t('units.consumption', {
+          volume: symbol,
+          distance,
+        })
+        return {
+          symbol,
+          consumptionSymbol,
+          // "Litres" / "Gallons" / "Kilowatt-hours", for field labels.
+          name: electric
+            ? t('units.energyName')
+            : t(`units.volumeName.${units.volumeUnit}`),
+          value: (value: string | number) =>
+            withUnit(formatDecimal(value, locale, 2), symbol),
+          unitPrice: (value: string | number) =>
+            t('units.perUnit', {
+              price: formatMoney(value, locale, units.currency, 3),
+              unit: symbol,
+            }),
+          consumption: (value: string | number) =>
+            withUnit(formatDecimal(value, locale, 2), consumptionSymbol),
+        }
+      },
     }
   }, [units, locale, t])
 }

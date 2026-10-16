@@ -19,6 +19,7 @@ const profile = {
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -720,5 +721,89 @@ describe('car editing', () => {
     expect(
       calls.filter((call) => call.key === `DELETE ${carPath}`),
     ).toHaveLength(1)
+  })
+})
+
+describe('car fuel lock', () => {
+  const option = (name: string) =>
+    within(screen.getByRole('combobox', { name: 'Fuel' })).getByRole('option', {
+      name,
+    })
+
+  it('disables switching a car with refuels to electric and says why', async () => {
+    backend({
+      [`GET ${carPath}`]: () => response(200, { ...golf, refuelCount: 23 }),
+    })
+    renderApp(`/cars/${golf.id}/edit`)
+
+    const fuel = await screen.findByRole('combobox', { name: 'Fuel' })
+    expect(option('Electric')).toBeDisabled()
+    expect(option('Gasoline')).toBeEnabled()
+    expect(option('Other')).toBeEnabled()
+    expect(fuel).toHaveAccessibleDescription(
+      'This car has 23 refuels, so its fuel cannot be switched to or from electric. Delete its refuels first to change it.',
+    )
+  })
+
+  it('disables every other fuel for an electric car with refuels', async () => {
+    backend({
+      [`GET ${carPath}`]: () =>
+        response(200, { ...golf, fuel: 'electric', refuelCount: 1 }),
+    })
+    renderApp(`/cars/${golf.id}/edit`)
+
+    await screen.findByRole('combobox', { name: 'Fuel' })
+    for (const name of ['Gasoline', 'Diesel', 'Other']) {
+      expect(option(name)).toBeDisabled()
+    }
+    expect(option('Electric')).toBeEnabled()
+    expect(screen.getByText(/This car has 1 refuel, so/)).toBeInTheDocument()
+  })
+
+  it('offers every fuel and no notice for a car without refuels', async () => {
+    backend({ [`GET ${carPath}`]: () => response(200, golf) })
+    renderApp(`/cars/${golf.id}/edit`)
+
+    await screen.findByRole('combobox', { name: 'Fuel' })
+    expect(option('Electric')).toBeEnabled()
+    expect(screen.queryByText(/cannot be switched/)).toBeNull()
+  })
+
+  it('shows a fuel_locked rejection at the fuel field and keeps the input', async () => {
+    backend({
+      [`GET ${carPath}`]: () => response(200, golf),
+      [`PATCH ${carPath}`]: () =>
+        response(400, {
+          code: 'validation_failed',
+          message: 'request validation failed',
+          fields: { fuel: 'fuel_locked' },
+        }),
+    })
+    const user = userEvent.setup()
+    const { router } = renderApp(`/cars/${golf.id}/edit`)
+
+    const fuel = await screen.findByRole('combobox', { name: 'Fuel' })
+    await user.selectOptions(fuel, 'electric')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByText(
+        'This car has refuels, so its fuel cannot be switched to or from electric.',
+      ),
+    ).toHaveAttribute('id', 'car-fuel-error')
+    expect(fuel).toHaveValue('electric')
+    expect(router.state.location.pathname).toBe(`/cars/${golf.id}/edit`)
+  })
+
+  it('explains the lock in German', async () => {
+    await i18n.changeLanguage('de')
+    backend({
+      [`GET ${carPath}`]: () => response(200, { ...golf, refuelCount: 2 }),
+    })
+    renderApp(`/cars/${golf.id}/edit`)
+
+    expect(
+      await screen.findByText(/Dieses Auto hat 2 Tankvorgänge/),
+    ).toBeInTheDocument()
   })
 })

@@ -1362,6 +1362,24 @@ select:focus-visible {
   cursor: crosshair;
 }
 
+.chart-plot-two-axes {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.chart-plot-two-axes .chart-area {
+  border-right: 1px solid var(--line);
+}
+
+/* Unit captions over the left and right value axes. */
+.chart-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 .chart-area:focus-visible {
   outline: 3px solid rgb(145 194 12 / 45%);
   outline-offset: 3px;
@@ -1406,6 +1424,15 @@ select:focus-visible {
   right: 0;
   transform: translateY(-50%);
   white-space: nowrap;
+}
+
+.chart-y-axis-right {
+  text-align: left;
+}
+
+.chart-y-axis-right > .chart-tick {
+  right: auto;
+  left: 0;
 }
 
 .chart-x-axis {
@@ -1536,7 +1563,8 @@ select:focus-visible {
 }
 
 /* Fuel-price lines: the car's fuel picks the hue, the refuel's fuel the
-   shade (normal mid, premium dark, other light). The light shades fall
+   shade (normal mid, premium dark, other light; for electric charging DC
+   darkest, then AC, home, and other lightest). The light shades fall
    below 3:1 against the chart card; the legend and the refuel table carry
    them. */
 .chart-fuel-gasoline-normal {
@@ -1563,16 +1591,20 @@ select:focus-visible {
   --series: #60a5fa;
 }
 
-.chart-fuel-electric-normal {
-  --series: #0d9488;
+.chart-fuel-electric-dc {
+  --series: #134e4a;
 }
 
-.chart-fuel-electric-special {
-  --series: #115e59;
+.chart-fuel-electric-ac {
+  --series: #0f766e;
+}
+
+.chart-fuel-electric-home {
+  --series: #14b8a6;
 }
 
 .chart-fuel-electric-other {
-  --series: #2dd4bf;
+  --series: #5eead4;
 }
 
 .chart-fuel-other-normal {

@@ -125,10 +125,10 @@ function CarView({ car }: { car: Car }) {
             <CarDetails car={car} />
           </TabPanel>
           <TabPanel>
-            <CarExpenses filter={filter} />
+            <CarExpenses filter={filter} carFuel={car.fuel} />
           </TabPanel>
           <TabPanel>
-            <CarConsumption filter={filter} />
+            <CarConsumption filter={filter} carFuel={car.fuel} />
           </TabPanel>
         </TabPanels>
       </TabGroup>

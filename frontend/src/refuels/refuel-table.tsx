@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import type { Car, Refuel } from '#/api/client'
+import type { Car, CarFuel, Refuel } from '#/api/client'
 import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
 import { carLabel } from '#/cars/format'
@@ -9,18 +9,22 @@ import { useUnitFormat } from '#/lib/display-units'
 import { formatInstantDate } from '#/repairs/format'
 
 // The refuels table shared by /refuels and a car's Expenses tab. Leaving out
-// cars hides the car column. Consumption comes from derived, the chart
-// series, because a table page may not hold each row's predecessor. A total
-// adds a footer row summing the amounts.
+// cars hides the car column; carFuel then gives the one car's fuel. Each
+// row's quantity, unit price and consumption carry the unit of its car (kWh
+// for an electric car), so the headers name none. Consumption comes from
+// derived, the chart series, because a table page may not hold each row's
+// predecessor. A total adds a footer row summing the amounts.
 export function RefuelTable({
   items,
   derived,
   cars,
+  carFuel,
   total,
 }: {
   items: Refuel[]
   derived: Map<string, Refuel>
   cars?: Map<string, Car>
+  carFuel?: CarFuel
   total?: number
 }) {
   const { t, i18n } = useTranslation()
@@ -41,10 +45,10 @@ export function RefuelTable({
               {units.odometerColumn}
             </th>
             <th scope="col" className="numeric">
-              {units.volumeName}
+              {t('refuels.fields.quantity')}
             </th>
             <th scope="col" className="numeric">
-              {units.perVolumeName}
+              {t('refuels.fields.unitPrice')}
             </th>
             <th scope="col" className="numeric">
               {t('refuels.fields.amount')}
@@ -60,6 +64,9 @@ export function RefuelTable({
         <tbody>
           {items.map((refuel) => {
             const consumption = derived.get(refuel.id)?.consumption
+            const quantity = units.quantity(
+              cars?.get(refuel.carId)?.fuel ?? carFuel,
+            )
             return (
               <tr
                 key={refuel.id}
@@ -89,13 +96,15 @@ export function RefuelTable({
                     ? t('refuels.notRecorded')
                     : units.distance(refuel.odometerReading)}
                 </td>
-                <td className="numeric">{units.volume(refuel.liters)}</td>
+                <td className="numeric">{quantity.value(refuel.quantity)}</td>
                 <td className="numeric">
-                  {units.pricePerVolume(refuel.perLiter)}
+                  {quantity.unitPrice(refuel.unitPrice)}
                 </td>
                 <td className="numeric">{units.money(refuel.amount)}</td>
                 <td className="numeric">
-                  {consumption == null ? '—' : units.consumption(consumption)}
+                  {consumption == null
+                    ? '—'
+                    : quantity.consumption(consumption)}
                 </td>
                 <td className="attachment-cell">
                   <AttachmentIndicator

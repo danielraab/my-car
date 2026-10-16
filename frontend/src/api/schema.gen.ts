@@ -236,6 +236,7 @@ export interface paths {
         delete: operations["deleteCar"];
         options?: never;
         head?: never;
+        /** @description Applies every supplied member. Changing `fuel` to or from `electric` while the car has refuels is rejected with `400` and `fields.fuel` set to `fuel_locked`; changes among `diesel`, `gasoline` and `other` are always allowed. */
         patch: operations["updateCar"];
         trace?: never;
     };
@@ -593,7 +594,7 @@ export interface components {
             /** @example validation_failed */
             code: string;
             message: string;
-            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), `negative` (a numeric value below zero), and `before_first_registration` (a deregistration date earlier than the car's first registration). */
+            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), `negative` (a numeric value below zero), `non_positive` (a numeric value that must be greater than zero), `before_first_registration` (a deregistration date earlier than the car's first registration), `fuel_mismatch` (a refuel subtype that does not fit the car's fuel), and `fuel_locked` (a car fuel change to or from `electric` while the car has refuels). */
             fields?: {
                 [key: string]: string;
             };
@@ -740,6 +741,8 @@ export interface components {
             id: components["schemas"]["UUID"];
             /** @description Number of attachments of this entry. */
             readonly attachmentCount: number;
+            /** @description Number of refuels of this car. While it is above zero, the car's fuel cannot be changed to or from `electric`. */
+            readonly refuelCount: number;
             type: string;
             make: string;
             name: string;
@@ -776,10 +779,13 @@ export interface components {
             station: string;
             /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
-            /** @enum {string} */
-            fuel: "normal" | "special" | "other";
-            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
-            liters: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
         };
         RefuelUpdate: {
@@ -788,10 +794,13 @@ export interface components {
             station?: string;
             /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
-            /** @enum {string} */
-            fuel?: "normal" | "special" | "other";
-            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
-            liters?: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel?: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity?: components["schemas"]["Decimal"];
             amount?: components["schemas"]["Decimal"];
         };
         Refuel: {
@@ -804,16 +813,19 @@ export interface components {
             station: string;
             /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading: number | null;
-            /** @enum {string} */
-            fuel: "normal" | "special" | "other";
-            /** @description Fuel volume in the account's volume unit (`volumeUnit`), despite the member name; never converted when that setting changes. */
-            liters: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
-            /** @description Amount divided by `liters`: the price per unit of the account's volume unit, in the account's currency. */
-            perLiter: components["schemas"]["Decimal"];
+            /** @description Amount divided by `quantity`: the price per kWh for an electric car, otherwise per unit of the account's volume unit, in the account's currency. */
+            unitPrice: components["schemas"]["Decimal"];
             /** @description Distance since the car's previous refuel, in the account's distance unit. */
             distance: number | null;
-            /** @description Volume per 100 distance units, in the account's volume and distance units (for example l/100 km or gal/100 mi). */
+            /** @description Quantity per 100 distance units: kWh for an electric car, otherwise the account's volume unit, per 100 of the account's distance unit (for example l/100 km, gal/100 mi or kWh/100 km). */
             consumption: string | null;
         };
         RefuelPage: {

@@ -11,6 +11,7 @@ import { RefuelTable } from './refuel-table'
 const golf: Car = {
   id: '22222222-2222-2222-2222-222222222222',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -35,9 +36,9 @@ const refuel: Refuel = {
   station: 'Fuel',
   odometerReading: 1500,
   fuel: 'normal',
-  liters: '40',
+  quantity: '40',
   amount: '60',
-  perLiter: '1.5',
+  unitPrice: '1.5',
   distance: null,
   consumption: null,
 }
@@ -76,15 +77,15 @@ describe('RefuelTable', () => {
       </DisplayUnitsContext.Provider>,
     )
     expect(
-      await screen.findByRole('columnheader', { name: 'Gallons' }),
+      await screen.findByRole('columnheader', { name: 'Quantity' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('columnheader', { name: 'Per gallon' }),
+      screen.getByRole('columnheader', { name: 'Unit price' }),
     ).toBeInTheDocument()
     const row = screen.getAllByRole('row')[1]
     expect(row).toHaveTextContent('1,500 mi')
     expect(row).toHaveTextContent('40 gal')
-    expect(row).toHaveTextContent('$1.500')
+    expect(row).toHaveTextContent('$1.500/gal')
     expect(row).toHaveTextContent('$60.00')
     expect(row).toHaveTextContent('7.12 gal/100 mi')
     expect(screen.getAllByRole('row')[2]).toHaveTextContent('$60.00')

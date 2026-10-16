@@ -43,7 +43,7 @@ func TestMapFixture(t *testing.T) {
 			t.Errorf("refuel %d car = %s, want %s", i, plan.Refuels[i].CarID, carID)
 		}
 	}
-	if r := plan.Refuels[1]; r.Fuel != "special" || r.OdometerReading != nil || r.Liters != "30" || r.Amount != "55.9" {
+	if r := plan.Refuels[1]; r.Fuel != "special" || r.OdometerReading != nil || r.Quantity != "30" || r.Amount != "55.9" {
 		t.Errorf("refuel = %+v", r)
 	}
 	if r := plan.Repairs[0]; r.Type != "wearing_part" || *r.OdometerReading != "121000" || r.CarID != golf.ID {
@@ -194,5 +194,21 @@ func TestProblemsNeverContainCredentials(t *testing.T) {
 		if s := p.String(); strings.Contains(s, "SECRET") {
 			t.Fatalf("problem leaks a credential: %s", s)
 		}
+	}
+}
+
+func TestMapRefuelsOfElectricCarToChargingSubtypes(t *testing.T) {
+	plan, problems := Map(mutate(t, "Cars", 1, "fuel", text("Electric")))
+	if len(problems) != 0 {
+		t.Fatalf("problems = %v", problems)
+	}
+	if plan.Cars[1].Fuel != "electric" {
+		t.Fatalf("car fuel = %s, want electric", plan.Cars[1].Fuel)
+	}
+	if r := plan.Refuels[1]; r.CarID != plan.Cars[1].ID || r.Fuel != "dc" || r.Quantity != "30" {
+		t.Errorf("charge = %+v, want subtype dc and quantity 30", r)
+	}
+	if r := plan.Refuels[0]; r.Fuel != "normal" {
+		t.Errorf("refuel of a diesel car = %+v, want subtype normal", r)
 	}
 }

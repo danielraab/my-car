@@ -15,6 +15,9 @@ import (
 // exist or belongs to another account.
 var ErrNotFound = errors.New("refuel not found")
 
+// ErrFuelMismatch reports a subtype that does not fit the car's fuel.
+var ErrFuelMismatch = errors.New("refuel subtype does not fit the car's fuel")
+
 // Refuel is a stored refuel. The amount is a decimal string exactly as it
 // appears on the wire; an unrecorded description is empty.
 type Refuel struct {
@@ -24,7 +27,7 @@ type Refuel struct {
 	Station         string
 	OdometerReading *int64
 	Fuel            string
-	Liters          string
+	Quantity        string
 	Amount          string
 	AttachmentCount int
 }
@@ -36,7 +39,7 @@ type Input struct {
 	Station         string
 	OdometerReading *int64
 	Fuel            string
-	Liters          string
+	Quantity        string
 	Amount          string
 }
 
@@ -49,9 +52,9 @@ type NullableInt struct {
 
 // Patch is a validated partial update; nil pointers leave columns unchanged.
 type Patch struct {
-	Date                          *time.Time
-	Station, Fuel, Liters, Amount *string
-	OdometerReading               NullableInt
+	Date                            *time.Time
+	Station, Fuel, Quantity, Amount *string
+	OdometerReading                 NullableInt
 }
 
 // Filter narrows a listing; nil members do not filter.
@@ -91,7 +94,7 @@ type Store struct{ pool *pgxpool.Pool }
 
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, car_id, date, station, odometer_reading, fuel::text, liters::text, amount::text, (SELECT count(*) FROM attachments a WHERE a.refuel_id = refuels.id)`
+const columns = `id, car_id, date, station, odometer_reading, fuel::text, quantity::text, amount::text, (SELECT count(*) FROM attachments a WHERE a.refuel_id = refuels.id)`
 
 // owned restricts refuels to those on the account in $1's cars; refuels
 // have no account column of their own.
@@ -99,7 +102,7 @@ const owned = `car_id IN (SELECT id FROM cars WHERE account_id = $1)`
 
 func scanRefuel(row pgx.Row) (Refuel, error) {
 	var r Refuel
-	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Fuel, &r.Liters, &r.Amount, &r.AttachmentCount)
+	err := row.Scan(&r.ID, &r.CarID, &r.Date, &r.Station, &r.OdometerReading, &r.Fuel, &r.Quantity, &r.Amount, &r.AttachmentCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Refuel{}, ErrNotFound
 	}
@@ -147,12 +150,40 @@ LIMIT $7`, accountID, f.CarID, f.From, f.To, afterDate, afterID, limit+1)
 }
 
 // Create inserts a refuel on one of the account's cars; a car the account
-// does not own inserts nothing and reports ErrNotFound.
+// does not own inserts nothing and reports ErrNotFound, and a subtype that
+// does not fit the car's fuel reports ErrFuelMismatch. The car row is
+// share-locked, so a concurrent fuel change cannot slip in between the
+// check and the insert.
 func (s *Store) Create(ctx context.Context, accountID string, in Input) (Refuel, error) {
-	return scanRefuel(s.pool.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, odometer_reading, fuel, liters, amount)
-	SELECT id, $3, $4, $5, $6::text::refuel_fuel, $7::text::numeric, $8::text::numeric FROM cars WHERE account_id = $1 AND id = $2
+	var created Refuel
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := checkCarFuel(ctx, tx, `SELECT fuel::text FROM cars WHERE account_id = $1 AND id = $2 FOR SHARE`, accountID, in.CarID, in.Fuel); err != nil {
+			return err
+		}
+		var err error
+		created, err = scanRefuel(tx.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, odometer_reading, fuel, quantity, amount)
+VALUES ($1, $2, $3, $4, $5::text::refuel_fuel, $6::text::numeric, $7::text::numeric)
 RETURNING `+columns,
-		accountID, in.CarID, in.Date, in.Station, in.OdometerReading, in.Fuel, in.Liters, in.Amount))
+			in.CarID, in.Date, in.Station, in.OdometerReading, in.Fuel, in.Quantity, in.Amount))
+		return err
+	})
+	return created, err
+}
+
+// checkCarFuel reads a car's fuel with query (parameters accountID and id)
+// and reports ErrNotFound when there is no such car, or ErrFuelMismatch
+// when subtype does not fit it.
+func checkCarFuel(ctx context.Context, tx pgx.Tx, query, accountID, id, subtype string) error {
+	var carFuel string
+	if err := tx.QueryRow(ctx, query, accountID, id).Scan(&carFuel); errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	if !FitsCarFuel(carFuel, subtype) {
+		return ErrFuelMismatch
+	}
+	return nil
 }
 
 func (s *Store) Get(ctx context.Context, accountID, refuelID string) (Refuel, error) {
@@ -161,18 +192,32 @@ func (s *Store) Get(ctx context.Context, accountID, refuelID string) (Refuel, er
 
 // Update applies a patch in one statement: COALESCE keeps columns that were
 // not supplied, and CASE on the Set flag lets the odometer reading be
-// cleared as well as kept or replaced.
+// cleared as well as kept or replaced. A supplied subtype is first checked
+// against the refuel's car's fuel, with the car row share-locked as in
+// Create.
 func (s *Store) Update(ctx context.Context, accountID, refuelID string, p Patch) (Refuel, error) {
-	return scanRefuel(s.pool.QueryRow(ctx, `UPDATE refuels SET
+	var updated Refuel
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if p.Fuel != nil {
+			if err := checkCarFuel(ctx, tx, `SELECT c.fuel::text FROM cars c JOIN refuels r ON r.car_id = c.id
+WHERE c.account_id = $1 AND r.id = $2 FOR SHARE OF c`, accountID, refuelID, *p.Fuel); err != nil {
+				return err
+			}
+		}
+		var err error
+		updated, err = scanRefuel(tx.QueryRow(ctx, `UPDATE refuels SET
   date = COALESCE($3, date),
   station = COALESCE($4, station),
   fuel = COALESCE($5::text::refuel_fuel, fuel),
-  liters = COALESCE($6::text::numeric, liters),
+  quantity = COALESCE($6::text::numeric, quantity),
   amount = COALESCE($7::text::numeric, amount),
   odometer_reading = CASE WHEN $8::boolean THEN $9 ELSE odometer_reading END
 WHERE `+owned+` AND id = $2
 RETURNING `+columns,
-		accountID, refuelID, p.Date, p.Station, p.Fuel, p.Liters, p.Amount, p.OdometerReading.Set, p.OdometerReading.Value))
+			accountID, refuelID, p.Date, p.Station, p.Fuel, p.Quantity, p.Amount, p.OdometerReading.Set, p.OdometerReading.Value))
+		return err
+	})
+	return updated, err
 }
 
 // Chart returns every matching refuel in deterministic order, and for each
