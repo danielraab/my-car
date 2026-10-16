@@ -201,7 +201,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Updates the caller's first and/or last name. Names are trimmed and may be empty. The email address is read-only; a body containing `email` is rejected with `400` and a `read_only` reason for `email`, and nothing is applied. */
+        /** @description Updates the caller's first and/or last name and display settings (currency, volume unit, distance unit). Names are trimmed and may be empty. A currency that is not a known ISO 4217 code, or a unit outside its enum, is rejected with an `invalid_enum` reason. Changing a display setting only relabels values; no stored amount, volume or distance is converted. The email address is read-only; a body containing `email` is rejected with `400` and a `read_only` reason for `email`, and nothing is applied. */
         patch: operations["updateMe"];
         trace?: never;
     };
@@ -236,6 +236,7 @@ export interface paths {
         delete: operations["deleteCar"];
         options?: never;
         head?: never;
+        /** @description Applies every supplied member. Changing `fuel` to or from `electric` while the car has refuels is rejected with `400` and `fields.fuel` set to `fuel_locked`; changes among `diesel`, `gasoline` and `other` are always allowed. */
         patch: operations["updateCar"];
         trace?: never;
     };
@@ -593,7 +594,7 @@ export interface components {
             /** @example validation_failed */
             code: string;
             message: string;
-            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), `negative` (a numeric value below zero), and `before_first_registration` (a deregistration date earlier than the car's first registration). */
+            /** @description Validation details keyed by request member name (`_body` for the request as a whole). Values are machine-readable reasons, such as `read_only` (the member cannot be changed), `unknown` (the member is not part of the request schema), `invalid_type` (wrong JSON type), `too_long` (exceeds the documented maximum length), `required` (a required member is missing), `empty` (a string is blank after trimming), `invalid_enum` (not one of the documented codes), `invalid_date` (not an RFC 3339 full-date), `invalid_decimal` (not a decimal string), `negative` (a numeric value below zero), `non_positive` (a numeric value that must be greater than zero), `before_first_registration` (a deregistration date earlier than the car's first registration), `fuel_mismatch` (a refuel subtype that does not fit the car's fuel), and `fuel_locked` (a car fuel change to or from `electric` while the car has refuels). */
             fields?: {
                 [key: string]: string;
             };
@@ -604,10 +605,31 @@ export interface components {
             email: string;
             firstName: string;
             lastName: string;
+            currency: components["schemas"]["Currency"];
+            volumeUnit: components["schemas"]["VolumeUnit"];
+            distanceUnit: components["schemas"]["DistanceUnit"];
         };
+        /**
+         * @description The account's currency as an ISO 4217 alphabetic code. It only labels amounts; stored amounts are never converted when it changes.
+         * @example EUR
+         */
+        Currency: string;
+        /**
+         * @description The unit the account's refuel volumes are recorded and shown in. It only labels values; stored volumes are never converted when it changes.
+         * @enum {string}
+         */
+        VolumeUnit: "liter" | "gallon";
+        /**
+         * @description The unit the account's odometer readings and distances are recorded and shown in. It only labels values; stored readings are never converted when it changes.
+         * @enum {string}
+         */
+        DistanceUnit: "kilometer" | "mile";
         ProfileUpdate: {
             firstName?: string;
             lastName?: string;
+            currency?: components["schemas"]["Currency"];
+            volumeUnit?: components["schemas"]["VolumeUnit"];
+            distanceUnit?: components["schemas"]["DistanceUnit"];
         };
         Session: {
             profile: components["schemas"]["Profile"];
@@ -719,6 +741,8 @@ export interface components {
             id: components["schemas"]["UUID"];
             /** @description Number of attachments of this entry. */
             readonly attachmentCount: number;
+            /** @description Number of refuels of this car. While it is above zero, the car's fuel cannot be changed to or from `electric`. */
+            readonly refuelCount: number;
             type: string;
             make: string;
             name: string;
@@ -753,20 +777,30 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
-            /** @enum {string} */
-            fuel: "normal" | "special" | "other";
-            liters: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
         };
         RefuelUpdate: {
             /** Format: date-time */
             date?: string;
             station?: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
-            /** @enum {string} */
-            fuel?: "normal" | "special" | "other";
-            liters?: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel?: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity?: components["schemas"]["Decimal"];
             amount?: components["schemas"]["Decimal"];
         };
         Refuel: {
@@ -777,13 +811,21 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading: number | null;
-            /** @enum {string} */
-            fuel: "normal" | "special" | "other";
-            liters: components["schemas"]["Decimal"];
+            /**
+             * @description Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason.
+             * @enum {string}
+             */
+            fuel: "normal" | "special" | "home" | "ac" | "dc" | "other";
+            /** @description Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes. */
+            quantity: components["schemas"]["Decimal"];
             amount: components["schemas"]["Decimal"];
-            perLiter: components["schemas"]["Decimal"];
+            /** @description Amount divided by `quantity`: the price per kWh for an electric car, otherwise per unit of the account's volume unit, in the account's currency. */
+            unitPrice: components["schemas"]["Decimal"];
+            /** @description Distance since the car's previous refuel, in the account's distance unit. */
             distance: number | null;
+            /** @description Quantity per 100 distance units: kWh for an electric car, otherwise the account's volume unit, per 100 of the account's distance unit (for example l/100 km, gal/100 mi or kWh/100 km). */
             consumption: string | null;
         };
         RefuelPage: {
@@ -795,6 +837,7 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             type: "check" | "service" | "wearing_part" | "crash_repair";
@@ -805,6 +848,7 @@ export interface components {
             /** Format: date-time */
             date?: string;
             station?: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading?: number | null;
             /** @enum {string} */
             type?: "check" | "service" | "wearing_part" | "crash_repair";
@@ -820,6 +864,7 @@ export interface components {
             /** Format: date-time */
             date: string;
             station: string;
+            /** @description Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes. */
             odometerReading: number | null;
             /** @enum {string} */
             type: "check" | "service" | "wearing_part" | "crash_repair";
@@ -1643,7 +1688,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's refuels ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's refuels, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1722,7 +1767,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's repairs ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's repairs, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1774,7 +1819,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The caller's tickets ordered by date then ID. A `carId` that names no car of the caller's yields an empty page. */
+            /** @description The caller's tickets, newest first (by date then ID, both descending). A `carId` that names no car of the caller's yields an empty page. */
             200: {
                 headers: {
                     [name: string]: unknown;

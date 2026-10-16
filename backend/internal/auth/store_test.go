@@ -67,11 +67,15 @@ func TestStoreMagicLinkReplayAndIdentityConvergence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.Email != email {
-		t.Fatalf("email=%q", a.Email)
+	if a.Email != email || a.Currency != "EUR" || a.VolumeUnit != "liter" || a.DistanceUnit != "kilometer" {
+		t.Fatalf("account=%+v", a)
 	}
-	if _, err = s.Session(ctx, sessionDigest, now); err != nil {
+	session, err := s.Session(ctx, sessionDigest, now)
+	if err != nil {
 		t.Fatalf("atomic session: %v", err)
+	}
+	if session.Currency != "EUR" || session.VolumeUnit != "liter" || session.DistanceUnit != "kilometer" {
+		t.Fatalf("session account=%+v", session.Account)
 	}
 	if _, err = s.ConsumeMagicLink(ctx, magic, now); !errors.Is(err, ErrInvalidCredential) {
 		t.Fatalf("replay error=%v", err)

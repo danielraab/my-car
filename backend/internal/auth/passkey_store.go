@@ -106,7 +106,7 @@ func (s *Store) ListPasskeys(ctx context.Context, accountID string) ([]Passkey, 
 // AccountPasskeys loads an account and its passkeys for a login assertion.
 func (s *Store) AccountPasskeys(ctx context.Context, accountID string) (Account, []Passkey, error) {
 	var a Account
-	err := s.pool.QueryRow(ctx, `SELECT id,email,first_name,last_name FROM accounts WHERE id=$1`, accountID).Scan(&a.ID, &a.Email, &a.FirstName, &a.LastName)
+	err := s.pool.QueryRow(ctx, `SELECT `+AccountColumns+` FROM accounts WHERE id=$1`, accountID).Scan(a.ScanTargets()...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Account{}, nil, ErrInvalidCredential
 	}

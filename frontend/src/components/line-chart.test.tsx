@@ -161,4 +161,106 @@ describe('LineChart', () => {
       'Use the left and right arrow keys to step through the values.',
     )
   })
+
+  describe('with a right-axis series', () => {
+    const twoAxes: LineSeries[] = [
+      {
+        key: 'fuel',
+        className: 'chart-fuel-diesel-normal',
+        label: 'Diesel · Normal',
+        points: [
+          { id: 'f0', time: start, value: 1.5 },
+          { id: 'f1', time: start + 100 * day, value: 1.8 },
+        ],
+      },
+      {
+        key: 'charge',
+        className: 'chart-fuel-electric-dc',
+        label: 'Electric · DC fast',
+        axis: 'right',
+        points: [
+          { id: 'c0', time: start, value: 0.25 },
+          { id: 'c1', time: start + 50 * day, value: 0.75 },
+        ],
+      },
+    ]
+
+    function renderTwoAxes(lines: LineSeries[]) {
+      render(
+        <LineChart
+          series={lines}
+          formatValue={(value, line) => `${line.key}:${value}`}
+          formatTick={(value) => `t${value}`}
+          label="Prices"
+          empty={<p>Nothing</p>}
+          showLegend
+          axisLabels={{ left: 'Price per l', right: 'Price per kWh' }}
+        />,
+      )
+    }
+
+    const ticksOf = (selector: string) =>
+      [...document.querySelectorAll(`${selector} > .chart-tick`)].map((tick) =>
+        Number(tick.textContent?.slice(1)),
+      )
+    const dotsOf = (className: string) =>
+      [...document.querySelectorAll(`.${className} .chart-dot`)].map((dot) =>
+        Number(dot.getAttribute('y1')),
+      )
+
+    it('gives each axis its own round ticks over its own series', () => {
+      renderTwoAxes(twoAxes)
+      const left = ticksOf('.chart-y-axis:not(.chart-y-axis-right)')
+      const right = ticksOf('.chart-y-axis-right')
+      expect(Math.min(...left)).toBeGreaterThan(1)
+      expect(Math.max(...left)).toBeLessThan(2)
+      expect(Math.min(...right)).toBeGreaterThanOrEqual(0)
+      expect(Math.max(...right)).toBeLessThan(1)
+      // Gridlines follow the left axis only: its ticks plus one month start.
+      expect(document.querySelectorAll('.chart-grid line')).toHaveLength(
+        left.length + 3,
+      )
+      // Both series span most of the plot height on their own axis.
+      for (const dots of [
+        dotsOf('chart-fuel-diesel-normal'),
+        dotsOf('chart-fuel-electric-dc'),
+      ]) {
+        expect(Math.min(...dots)).toBeLessThan(20)
+        expect(Math.max(...dots)).toBeGreaterThan(80)
+      }
+      expect(screen.getByText('Price per kWh')).toBeInTheDocument()
+    })
+
+    it('draws a single axis when no series is on the right', () => {
+      renderTwoAxes([twoAxes[0]])
+      expect(document.querySelector('.chart-y-axis-right')).toBeNull()
+      expect(screen.queryByText('Price per kWh')).toBeNull()
+    })
+
+    it('plots right-axis series alone against the left axis', () => {
+      renderTwoAxes([twoAxes[1]])
+      expect(document.querySelector('.chart-y-axis-right')).toBeNull()
+      expect(Math.max(...ticksOf('.chart-y-axis'))).toBeLessThan(1)
+    })
+
+    it('picks and formats the nearest point on its own axis', async () => {
+      const user = userEvent.setup()
+      renderTwoAxes(twoAxes)
+      const plot = screen.getByRole('slider', { name: 'Prices' })
+      vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 1000,
+        bottom: 100,
+        width: 1000,
+        height: 100,
+        toJSON: () => ({}),
+      })
+      // The 0.75 charge sits near the top of the plot on the right axis.
+      await user.pointer({ target: plot, coords: { clientX: 500, clientY: 5 } })
+      expect(popover()).toHaveTextContent('Electric · DC fastcharge:0.75')
+    })
+  })
 })

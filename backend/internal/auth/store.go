@@ -12,7 +12,38 @@ import (
 
 var ErrInvalidCredential = errors.New("invalid or expired credential")
 
-type Account struct{ ID, Email, FirstName, LastName string }
+// Account is a user account with its profile and display settings. The
+// display settings only label values; they never convert stored data.
+type Account struct {
+	ID, Email, FirstName, LastName     string
+	Currency, VolumeUnit, DistanceUnit string
+}
+
+// Profile is the JSON representation of an account shared by the session
+// and profile operations (OpenAPI `Profile`).
+type Profile struct {
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	FirstName    string `json:"firstName"`
+	LastName     string `json:"lastName"`
+	Currency     string `json:"currency"`
+	VolumeUnit   string `json:"volumeUnit"`
+	DistanceUnit string `json:"distanceUnit"`
+}
+
+// Profile returns the account's API representation.
+func (a Account) Profile() Profile {
+	return Profile{ID: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Currency: a.Currency, VolumeUnit: a.VolumeUnit, DistanceUnit: a.DistanceUnit}
+}
+
+// AccountColumns lists the accounts columns that Scan expects, in order.
+const AccountColumns = "id,email,first_name,last_name,currency,volume_unit,distance_unit"
+
+// ScanTargets returns the destinations for AccountColumns.
+func (a *Account) ScanTargets() []any {
+	return []any{&a.ID, &a.Email, &a.FirstName, &a.LastName, &a.Currency, &a.VolumeUnit, &a.DistanceUnit}
+}
+
 type Session struct {
 	Account
 	ExpiresAt time.Time
@@ -69,7 +100,7 @@ func (s *Store) ResolveOIDCIdentity(ctx context.Context, issuer, subject, email 
 		return Account{}, err
 	}
 	var a Account
-	err = tx.QueryRow(ctx, `INSERT INTO accounts (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING id,email,first_name,last_name`, normalizeEmail(email)).Scan(&a.ID, &a.Email, &a.FirstName, &a.LastName)
+	err = tx.QueryRow(ctx, `INSERT INTO accounts (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING `+AccountColumns, normalizeEmail(email)).Scan(a.ScanTargets()...)
 	if err != nil {
 		return Account{}, err
 	}
@@ -112,7 +143,7 @@ func (s *Store) consumeMagicLink(ctx context.Context, digest, sessionDigest []by
 		return MagicLinkLogin{}, err
 	}
 	var a Account
-	err = tx.QueryRow(ctx, `INSERT INTO accounts (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING id,email,first_name,last_name`, email).Scan(&a.ID, &a.Email, &a.FirstName, &a.LastName)
+	err = tx.QueryRow(ctx, `INSERT INTO accounts (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING `+AccountColumns, email).Scan(a.ScanTargets()...)
 	if err != nil {
 		return MagicLinkLogin{}, err
 	}
@@ -130,7 +161,7 @@ func (s *Store) CreateSession(ctx context.Context, digest []byte, accountID stri
 }
 func (s *Store) Session(ctx context.Context, digest []byte, now time.Time) (Session, error) {
 	var out Session
-	err := s.pool.QueryRow(ctx, `SELECT a.id,a.email,a.first_name,a.last_name,s.expires_at,s.created_at,coalesce(s.credential_id::text,'') FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token_digest=$1 AND s.revoked_at IS NULL AND s.expires_at>$2`, digest, now).Scan(&out.ID, &out.Email, &out.FirstName, &out.LastName, &out.ExpiresAt, &out.CreatedAt, &out.PasskeyID)
+	err := s.pool.QueryRow(ctx, `SELECT a.id,a.email,a.first_name,a.last_name,a.currency,a.volume_unit,a.distance_unit,s.expires_at,s.created_at,coalesce(s.credential_id::text,'') FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token_digest=$1 AND s.revoked_at IS NULL AND s.expires_at>$2`, digest, now).Scan(append(out.Account.ScanTargets(), &out.ExpiresAt, &out.CreatedAt, &out.PasskeyID)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrInvalidCredential
 	}

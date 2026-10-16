@@ -55,9 +55,9 @@ VALUES ($1, $2, $3, $4, $5, $6::text::vehicle_fuel, $7::text::date, $8, $9, $10,
 			c.ID, c.AccountID, c.Type, c.Make, c.Name, c.Fuel, c.FirstRegistration, c.LicensePlate, c.FIN, c.IsActive, c.PurchaseDate, c.PurchasePrice, c.CreatedAt, c.UpdatedAt)
 	}
 	for _, r := range plan.Refuels {
-		batch.Queue(`INSERT INTO refuels (id, car_id, date, station, odometer_reading, fuel, liters, amount, created_at, updated_at)
+		batch.Queue(`INSERT INTO refuels (id, car_id, date, station, odometer_reading, fuel, quantity, amount, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5::text::bigint, $6::text::refuel_fuel, $7::text::numeric, $8::text::numeric, $9, $10)`,
-			r.ID, r.CarID, r.Date, r.Station, r.OdometerReading, r.Fuel, r.Liters, r.Amount, r.CreatedAt, r.UpdatedAt)
+			r.ID, r.CarID, r.Date, r.Station, r.OdometerReading, r.Fuel, r.Quantity, r.Amount, r.CreatedAt, r.UpdatedAt)
 	}
 	for _, r := range plan.Repairs {
 		batch.Queue(`INSERT INTO repairs (id, car_id, date, station, odometer_reading, type, amount, description, created_at, updated_at)

@@ -36,7 +36,7 @@ func (f *fakeRepository) Chart(_ context.Context, _ string, x Filter) ([]Refuel,
 }
 func (f *fakeRepository) Create(_ context.Context, _ string, x Input) (Refuel, error) {
 	f.input = x
-	return Refuel{ID: refuelID, CarID: x.CarID, Date: x.Date, Station: x.Station, OdometerReading: x.OdometerReading, Fuel: x.Fuel, Liters: x.Liters, Amount: x.Amount}, f.err
+	return Refuel{ID: refuelID, CarID: x.CarID, Date: x.Date, Station: x.Station, OdometerReading: x.OdometerReading, Fuel: x.Fuel, Quantity: x.Quantity, Amount: x.Amount}, f.err
 }
 func (f *fakeRepository) Get(context.Context, string, string) (Refuel, error) {
 	if f.err != nil {
@@ -46,7 +46,10 @@ func (f *fakeRepository) Get(context.Context, string, string) (Refuel, error) {
 }
 func (f *fakeRepository) Update(_ context.Context, _ string, _ string, x Patch) (Refuel, error) {
 	f.patch = x
-	return f.items[0], f.err
+	if f.err != nil {
+		return Refuel{}, f.err
+	}
+	return f.items[0], nil
 }
 func (f *fakeRepository) Delete(context.Context, string, string) error { return f.err }
 func (f *fakeRepository) Stations(context.Context, string) ([]string, error) {
@@ -66,15 +69,15 @@ func serve(t *testing.T, repo Repository, method, target, body string) *httptest
 	return w
 }
 func sample(odo *int64) Refuel {
-	return Refuel{ID: refuelID, CarID: carID, Date: stamp, Station: "Fuel", OdometerReading: odo, Fuel: "normal", Liters: "40", Amount: "60"}
+	return Refuel{ID: refuelID, CarID: carID, Date: stamp, Station: "Fuel", OdometerReading: odo, Fuel: "normal", Quantity: "40", Amount: "60"}
 }
 func TestCreateAndValidation(t *testing.T) {
 	f := &fakeRepository{}
-	w := serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":" Fuel ","fuel":"normal","liters":"40","amount":"60"}`)
-	if w.Code != 201 || f.input.Liters != "40" {
+	w := serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":" Fuel ","fuel":"normal","quantity":"40","amount":"60"}`)
+	if w.Code != 201 || f.input.Quantity != "40" {
 		t.Fatalf("code=%d input=%+v body=%s", w.Code, f.input, w.Body.String())
 	}
-	w = serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":"Fuel","fuel":"normal","liters":"0","amount":"60"}`)
+	w = serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":"Fuel","fuel":"normal","quantity":"0","amount":"60"}`)
 	if w.Code != 400 || !strings.Contains(w.Body.String(), "non_positive") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
@@ -86,7 +89,7 @@ func TestCreateAndValidation(t *testing.T) {
 func TestChartDerivedValuesAcrossCars(t *testing.T) {
 	a, b := int64(1000), int64(1500)
 	other := int64(2000)
-	f := &fakeRepository{items: []Refuel{sample(&a), {ID: "44444444-4444-4444-4444-444444444444", CarID: "55555555-5555-5555-5555-555555555555", Date: stamp, Station: "X", OdometerReading: &other, Fuel: "special", Liters: "20", Amount: "30"}, {ID: "66666666-6666-6666-6666-666666666666", CarID: carID, Date: stamp.Add(time.Hour), Station: "Y", OdometerReading: &b, Fuel: "normal", Liters: "40", Amount: "60"}}}
+	f := &fakeRepository{items: []Refuel{sample(&a), {ID: "44444444-4444-4444-4444-444444444444", CarID: "55555555-5555-5555-5555-555555555555", Date: stamp, Station: "X", OdometerReading: &other, Fuel: "special", Quantity: "20", Amount: "30"}, {ID: "66666666-6666-6666-6666-666666666666", CarID: carID, Date: stamp.Add(time.Hour), Station: "Y", OdometerReading: &b, Fuel: "normal", Quantity: "40", Amount: "60"}}}
 	w := serve(t, f, "GET", "/api/v1/refuels/chart", "")
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
@@ -97,7 +100,7 @@ func TestChartDerivedValuesAcrossCars(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Items[0].PerLiter != "1.5" || got.Items[0].Consumption != nil || got.Items[2].Distance == nil || *got.Items[2].Distance != 500 || *got.Items[2].Consumption != "8" {
+	if got.Items[0].UnitPrice != "1.5" || got.Items[0].Consumption != nil || got.Items[2].Distance == nil || *got.Items[2].Distance != 500 || *got.Items[2].Consumption != "8" {
 		t.Fatalf("%+v", got.Items)
 	}
 }
@@ -107,7 +110,7 @@ func TestChartSeedsPredecessorBeforeFrom(t *testing.T) {
 	f := &fakeRepository{
 		items: []Refuel{
 			sample(&first),
-			{ID: "44444444-4444-4444-4444-444444444444", CarID: otherCar, Date: stamp, Station: "X", OdometerReading: &second, Fuel: "special", Liters: "20", Amount: "30"},
+			{ID: "44444444-4444-4444-4444-444444444444", CarID: otherCar, Date: stamp, Station: "X", OdometerReading: &second, Fuel: "special", Quantity: "20", Amount: "30"},
 		},
 		// Only carID has a refuel before the range; otherCar's first refuel
 		// in range is its first ever.
@@ -152,5 +155,65 @@ func TestAuthenticationAndNotFound(t *testing.T) {
 	w = serve(t, &fakeRepository{err: ErrNotFound}, "GET", "/api/v1/refuels/"+refuelID, "")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("missing code = %d", w.Code)
+	}
+}
+
+func TestFormerMemberNamesAreUnknown(t *testing.T) {
+	f := &fakeRepository{}
+	w := serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":"Fuel","fuel":"normal","liters":"40","amount":"60"}`)
+	if w.Code != 400 || !strings.Contains(w.Body.String(), `"liters":"unknown"`) || f.input.CarID != "" {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestChargeBody(t *testing.T) {
+	a, b := int64(1000), int64(1200)
+	f := &fakeRepository{items: []Refuel{
+		{ID: refuelID, CarID: carID, Date: stamp, Station: "Home", OdometerReading: &a, Fuel: "home", Quantity: "40", Amount: "14.00"},
+		{ID: "66666666-6666-6666-6666-666666666666", CarID: carID, Date: stamp.Add(time.Hour), Station: "Ionity", OdometerReading: &b, Fuel: "dc", Quantity: "34.4", Amount: "20"},
+	}}
+	w := serve(t, f, "GET", "/api/v1/refuels/chart", "")
+	if strings.Contains(w.Body.String(), "liters") || strings.Contains(w.Body.String(), "perLiter") {
+		t.Fatalf("body still carries former members: %s", w.Body.String())
+	}
+	var got struct{ Items []refuelBody }
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Items[0].UnitPrice != "0.35" || *got.Items[1].Distance != 200 || *got.Items[1].Consumption != "17.2" {
+		t.Fatalf("%+v", got.Items)
+	}
+}
+
+func TestChargingSubtypesAreAcceptedAndMismatchIsReported(t *testing.T) {
+	f := &fakeRepository{}
+	w := serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":"Ionity","fuel":"dc","quantity":"40","amount":"20"}`)
+	if w.Code != 201 || f.input.Fuel != "dc" {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	f = &fakeRepository{err: ErrFuelMismatch}
+	w = serve(t, f, "POST", "/api/v1/refuels", `{"carId":"`+carID+`","date":"2026-09-28T10:00:00Z","station":"Shell","fuel":"special","quantity":"40","amount":"60"}`)
+	if w.Code != 400 || !strings.Contains(w.Body.String(), `"fuel":"fuel_mismatch"`) {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	w = serve(t, f, "PATCH", "/api/v1/refuels/"+refuelID, `{"fuel":"home"}`)
+	if w.Code != 400 || !strings.Contains(w.Body.String(), `"fuel":"fuel_mismatch"`) {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestFitsCarFuel(t *testing.T) {
+	for _, tc := range []struct {
+		carFuel, subtype string
+		want             bool
+	}{
+		{"electric", "home", true}, {"electric", "ac", true}, {"electric", "dc", true}, {"electric", "other", true},
+		{"electric", "normal", false}, {"electric", "special", false},
+		{"diesel", "normal", true}, {"gasoline", "special", true}, {"other", "other", true},
+		{"diesel", "home", false}, {"gasoline", "ac", false}, {"other", "dc", false},
+	} {
+		if got := FitsCarFuel(tc.carFuel, tc.subtype); got != tc.want {
+			t.Errorf("FitsCarFuel(%q, %q) = %v, want %v", tc.carFuel, tc.subtype, got, tc.want)
+		}
 	}
 }

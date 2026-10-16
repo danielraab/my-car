@@ -129,3 +129,37 @@ the deletion; an attachment record SHALL never point to a missing file.
 - **WHEN** an entry is deleted and removing one of its stored files fails
 - **THEN** the entry and its attachment records stay deleted, the failure is
   logged, and the removal is retried later
+
+### Requirement: Accounts persist display settings
+The system SHALL persist a currency, a volume unit and a distance unit for
+every account. They SHALL default to `EUR`, `liter` and `kilometer`, both for
+accounts that existed before the settings were introduced and for newly
+created or imported accounts. The volume unit SHALL reject values other than
+`liter` and `gallon`, the distance unit values other than `kilometer` and
+`mile`, and the currency values that are not three uppercase ASCII letters.
+Changing a setting SHALL NOT modify any car or expense row.
+
+#### Scenario: Existing account after migration
+- **WHEN** the migration runs against a database with existing accounts
+- **THEN** every existing account has currency `EUR`, volume unit `liter` and
+  distance unit `kilometer`, and no car or expense value has changed
+
+#### Scenario: Unsupported unit is stored
+- **WHEN** a persistence operation sets an account's distance unit to a value
+  other than `kilometer` or `mile`
+- **THEN** the value is rejected and the stored setting is unchanged
+
+### Requirement: Refuels persist charging subtypes and a unit-neutral quantity
+The refuel subtype enumeration SHALL contain `normal`, `special`, `home`, `ac`, `dc`, and `other`. A refuel's quantity SHALL be stored in a column named `quantity` that keeps the existing constraint of being greater than zero; its unit is implied by the car's fuel and is not stored. Introducing these SHALL NOT change any existing refuel's subtype, quantity, amount, or other value.
+
+#### Scenario: Existing refuels after migration
+- **WHEN** the migration runs against a database with existing refuels
+- **THEN** every refuel keeps its subtype, and its former litres value is its quantity
+
+#### Scenario: Charging subtype is stored
+- **WHEN** a persistence operation stores a refuel with subtype `dc`
+- **THEN** the refuel is stored with subtype `dc`
+
+#### Scenario: Unsupported subtype is stored
+- **WHEN** a persistence operation stores a refuel with subtype `premium`
+- **THEN** the value is rejected and no refuel is stored

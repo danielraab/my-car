@@ -53,7 +53,7 @@ func TestRun(t *testing.T) {
 	if err := Run(ctx, pool, []string{"one@example.org", "two@example.org"}, now); err != nil {
 		t.Fatal(err)
 	}
-	for table, want := range map[string]int{"accounts": 2, "cars": 8, "refuels": 1000, "repairs": 150, "tickets": 180, "sessions": 0, "oidc_identities": 0, "oidc_login_attempts": 0, "magic_link_challenges": 0, "webauthn_credentials": 0, "webauthn_challenges": 0, "attachments": 0, "attachment_file_deletions": 1} {
+	for table, want := range map[string]int{"accounts": 2, "cars": 10, "refuels": 1000, "repairs": 150, "tickets": 180, "sessions": 0, "oidc_identities": 0, "oidc_login_attempts": 0, "magic_link_challenges": 0, "webauthn_credentials": 0, "webauthn_challenges": 0, "attachments": 0, "attachment_file_deletions": 1} {
 		var count int
 		if err := pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil || count != want {
 			t.Errorf("%s count = %d, error %v; want %d", table, count, err, want)
@@ -63,8 +63,17 @@ func TestRun(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM accounts WHERE email = 'old@example.org'").Scan(&oldAccounts); err != nil || oldAccounts != 0 {
 		t.Errorf("old account remains: %d, %v", oldAccounts, err)
 	}
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM (SELECT account_id FROM cars GROUP BY account_id HAVING count(*) <> 4) c").Scan(&wrongCarCounts); err != nil || wrongCarCounts != 0 {
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM (SELECT account_id FROM cars GROUP BY account_id HAVING count(*) <> 5) c").Scan(&wrongCarCounts); err != nil || wrongCarCounts != 0 {
 		t.Errorf("accounts with incorrect car counts: %d, %v", wrongCarCounts, err)
+	}
+	var electricAccounts, mismatched, charges int
+	if err := pool.QueryRow(ctx, "SELECT count(DISTINCT account_id) FROM cars WHERE fuel = 'electric'").Scan(&electricAccounts); err != nil || electricAccounts != 2 {
+		t.Errorf("accounts with an electric car: %d, %v; want 2", electricAccounts, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE (c.fuel = 'electric') <> (r.fuel IN ('home', 'ac', 'dc') OR (r.fuel = 'other' AND c.fuel = 'electric'))),
+		count(*) FILTER (WHERE c.fuel = 'electric')
+		FROM refuels r JOIN cars c ON c.id = r.car_id`).Scan(&mismatched, &charges); err != nil || mismatched != 0 || charges == 0 {
+		t.Errorf("refuels with a subtype not fitting the car: %d, charges: %d, %v", mismatched, charges, err)
 	}
 	for _, table := range []string{"refuels", "repairs", "tickets"} {
 		rows, err := pool.Query(ctx, "SELECT a.email, count(*), min(e.date), max(e.date) FROM "+table+" e JOIN cars c ON c.id=e.car_id JOIN accounts a ON a.id=c.account_id GROUP BY a.email")

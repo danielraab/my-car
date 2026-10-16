@@ -1,7 +1,12 @@
 import { type CSSProperties, type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { niceTicks, type TimeUnit, timeTicks } from '#/lib/chart-ticks'
+import {
+  niceTicks,
+  type TimeUnit,
+  timeTicks,
+  type ValueTicks,
+} from '#/lib/chart-ticks'
 
 import { ChartPopover } from './chart-popover'
 import { useChartInteraction } from './use-chart-interaction'
@@ -13,14 +18,18 @@ export type LineSeries = {
   className: string
   label: string
   points: LinePoint[]
+  // The value axis the series is plotted against; left by default.
+  axis?: 'left' | 'right'
 }
 
 // Date-axis labels nearer an end than this (in percent) are aligned to it
 // instead of centred, so they never hang past the plot.
 const edge = 12
 
-// Time-series lines sharing one value axis over a grid of round value ticks
-// and calendar boundaries. Points arrive in time order; those without a
+// Time-series lines over a grid of round value ticks and calendar
+// boundaries. Series share the left value axis unless some are assigned to
+// a right axis, which then gets ticks of its own; gridlines follow the left
+// axis. Points arrive in time order; those without a
 // finite time or value are left out, and without any points the chart
 // renders empty instead. The plot is one tab stop: hovering, tapping or
 // scrubbing picks the nearest point on screen, and the arrow keys step
@@ -33,14 +42,18 @@ export function LineChart({
   label,
   empty,
   showLegend = false,
+  axisLabels,
 }: {
   series: LineSeries[]
-  formatValue: (value: number) => string
+  // Formats a point's value for the popover; series is the point's line.
+  formatValue: (value: number, series: LineSeries) => string
   // Formats a value-axis tick; step is the distance between ticks.
   formatTick: (value: number, step: number) => string
   label: string
   empty: ReactNode
   showLegend?: boolean
+  // Unit captions above each value axis, shown when both axes are drawn.
+  axisLabels?: { left: string; right: string }
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
@@ -53,6 +66,12 @@ export function LineChart({
       ),
     }))
     .filter((line) => line.points.length > 0)
+  // A right axis only exists beside a left one; on its own, a right-axis
+  // series is plotted against the left axis.
+  const twoAxes =
+    lines.some((line) => line.axis === 'right') &&
+    lines.some((line) => line.axis !== 'right')
+  const onRight = (line: LineSeries) => twoAxes && line.axis === 'right'
   // Every point in stepping order: by date, then by series.
   const ordered = lines
     .flatMap((line, order) =>
@@ -61,17 +80,25 @@ export function LineChart({
     .sort((a, b) => a.time - b.time || a.order - b.order)
 
   const times = ordered.map((point) => point.time)
-  const values = ordered.map((point) => point.value)
   const minTime = Math.min(...times)
   const maxTime = Math.max(...times)
-  const ticks =
-    values.length > 0
+  const ticksOf = (right: boolean) => {
+    const values = ordered
+      .filter((point) => onRight(point.line) === right)
+      .map((point) => point.value)
+    return values.length > 0
       ? niceTicks(Math.min(...values), Math.max(...values))
       : niceTicks(0, 1)
+  }
+  const ticks = ticksOf(false)
+  const rightTicks = twoAxes ? ticksOf(true) : null
   const x = (time: number) =>
     maxTime === minTime ? 50 : ((time - minTime) / (maxTime - minTime)) * 100
-  const y = (value: number) =>
-    100 - ((value - ticks.start) / (ticks.end - ticks.start)) * 100
+  const scale = (axis: ValueTicks) => (value: number) =>
+    100 - ((value - axis.start) / (axis.end - axis.start)) * 100
+  const y = scale(ticks)
+  const yRight = rightTicks === null ? y : scale(rightTicks)
+  const yOf = (line: LineSeries) => (onRight(line) ? yRight : y)
 
   const { active, areaProps } = useChartInteraction(
     ordered.length,
@@ -80,7 +107,7 @@ export function LineChart({
       let best = Number.POSITIVE_INFINITY
       ordered.forEach((point, i) => {
         const dx = (x(point.time) / 100) * width - px
-        const dy = (y(point.value) / 100) * height - py
+        const dy = (yOf(point.line)(point.value) / 100) * height - py
         const distance = dx * dx + dy * dy
         if (distance < best) {
           best = distance
@@ -105,30 +132,48 @@ export function LineChart({
       : [
           date.format(current.time),
           showLegend ? current.line.label : null,
-          formatValue(current.value),
+          formatValue(current.value, current.line),
         ]
           .filter(Boolean)
           .join(' · ')
 
+  const valueAxis = (axis: ValueTicks, position: (value: number) => number) => (
+    <div
+      className={
+        axis === rightTicks ? 'chart-y-axis chart-y-axis-right' : 'chart-y-axis'
+      }
+      aria-hidden="true"
+    >
+      <div className="chart-y-sizer">
+        {axis.values.map((value) => (
+          <span key={value}>{formatTick(value, axis.step)}</span>
+        ))}
+      </div>
+      {axis.values.map((value) => (
+        <span
+          key={value}
+          className="chart-tick"
+          style={{ '--at': `${position(value)}%` } as CSSProperties}
+        >
+          {formatTick(value, axis.step)}
+        </span>
+      ))}
+    </div>
+  )
+  const currentY = current === null ? 0 : yOf(current.line)(current.value)
+
   return (
     <figure className="line-chart">
-      <div className="chart-plot">
-        <div className="chart-y-axis" aria-hidden="true">
-          <div className="chart-y-sizer">
-            {ticks.values.map((value) => (
-              <span key={value}>{formatTick(value, ticks.step)}</span>
-            ))}
-          </div>
-          {ticks.values.map((value) => (
-            <span
-              key={value}
-              className="chart-tick"
-              style={{ '--at': `${y(value)}%` } as CSSProperties}
-            >
-              {formatTick(value, ticks.step)}
-            </span>
-          ))}
+      {twoAxes && axisLabels ? (
+        <div className="chart-axis-labels" aria-hidden="true">
+          <span>{axisLabels.left}</span>
+          <span>{axisLabels.right}</span>
         </div>
+      ) : null}
+      <div
+        className={twoAxes ? 'chart-plot chart-plot-two-axes' : 'chart-plot'}
+      >
+        {valueAxis(ticks, y)}
         <div
           {...areaProps}
           className="chart-area"
@@ -168,41 +213,46 @@ export function LineChart({
                 />
               ))}
             </g>
-            {lines.map((line) => (
-              <g key={line.key} className={`chart-series ${line.className}`}>
-                {line.points.length > 1 ? (
-                  <polyline
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                    points={line.points
-                      .map((point) => `${x(point.time)},${y(point.value)}`)
-                      .join(' ')}
-                  />
-                ) : null}
-                {line.points.map((point) => (
-                  // A zero-length line with a round cap draws an undistorted dot.
-                  <line
-                    key={point.id}
-                    className={
-                      point.id === current?.id && line === current.line
-                        ? 'chart-dot chart-dot-active'
-                        : 'chart-dot'
-                    }
-                    vectorEffect="non-scaling-stroke"
-                    x1={x(point.time)}
-                    x2={x(point.time)}
-                    y1={y(point.value)}
-                    y2={y(point.value)}
-                  />
-                ))}
-              </g>
-            ))}
+            {lines.map((line) => {
+              const yLine = yOf(line)
+              return (
+                <g key={line.key} className={`chart-series ${line.className}`}>
+                  {line.points.length > 1 ? (
+                    <polyline
+                      fill="none"
+                      vectorEffect="non-scaling-stroke"
+                      points={line.points
+                        .map(
+                          (point) => `${x(point.time)},${yLine(point.value)}`,
+                        )
+                        .join(' ')}
+                    />
+                  ) : null}
+                  {line.points.map((point) => (
+                    // A zero-length line with a round cap draws an undistorted dot.
+                    <line
+                      key={point.id}
+                      className={
+                        point.id === current?.id && line === current.line
+                          ? 'chart-dot chart-dot-active'
+                          : 'chart-dot'
+                      }
+                      vectorEffect="non-scaling-stroke"
+                      x1={x(point.time)}
+                      x2={x(point.time)}
+                      y1={yLine(point.value)}
+                      y2={yLine(point.value)}
+                    />
+                  ))}
+                </g>
+              )
+            })}
           </svg>
           {current === null ? null : (
             <ChartPopover
               x={x(current.time)}
-              y={y(current.value)}
-              placement={y(current.value) >= 50 ? 'above' : 'below'}
+              y={currentY}
+              placement={currentY >= 50 ? 'above' : 'below'}
             >
               <strong>{date.format(current.time)}</strong>
               {showLegend ? (
@@ -210,14 +260,15 @@ export function LineChart({
                   <dt className={current.line.className}>
                     {current.line.label}
                   </dt>
-                  <dd>{formatValue(current.value)}</dd>
+                  <dd>{formatValue(current.value, current.line)}</dd>
                 </dl>
               ) : (
-                formatValue(current.value)
+                formatValue(current.value, current.line)
               )}
             </ChartPopover>
           )}
         </div>
+        {rightTicks === null ? null : valueAxis(rightTicks, yRight)}
         <div className="chart-x-axis" aria-hidden="true">
           {time.ticks
             .filter((tick) => tick.wide)

@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Car, Refuel } from '#/api/client'
 import { i18n } from '#/i18n'
 import { dateRangeToInstants, defaultFrom } from '#/lib/date-range'
@@ -11,10 +11,14 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 const car: Car = {
   id: '22222222-2222-2222-2222-222222222222',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Car',
   make: 'VW',
   name: 'Golf',
@@ -38,9 +42,9 @@ const refuel: Refuel = {
   station: 'Fuel',
   odometerReading: 1000,
   fuel: 'normal',
-  liters: '40',
+  quantity: '40',
   amount: '60',
-  perLiter: '1.5',
+  unitPrice: '1.5',
   distance: null,
   consumption: null,
 }
@@ -465,5 +469,206 @@ describe('refuel attachments', () => {
       await screen.findByText(/werden vor dem Hochladen verkleinert/),
     ).toBeInTheDocument()
     expect(screen.getByText('Anhänge')).toBeInTheDocument()
+  })
+})
+
+describe('refuels in another currency and units', () => {
+  beforeEach(() => {
+    Object.assign(profile, {
+      currency: 'USD',
+      volumeUnit: 'gallon',
+      distanceUnit: 'mile',
+    })
+  })
+  afterEach(() => {
+    Object.assign(profile, {
+      currency: 'EUR',
+      volumeUnit: 'liter',
+      distanceUnit: 'kilometer',
+    })
+  })
+
+  it('labels the list and chart with the account settings', async () => {
+    backend()
+    renderApp('/refuels')
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    expect(
+      within(table).getByRole('columnheader', { name: 'Quantity' }),
+    ).toBeInTheDocument()
+    expect(
+      within(table).getByRole('columnheader', { name: 'Unit price' }),
+    ).toBeInTheDocument()
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent(
+      /\$[\d.]+\/gal/,
+    )
+    expect(
+      screen.getByText(/^Price per gallon \(fuel\) or per kWh \(charging\)/),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the units next to the form inputs', async () => {
+    backend()
+    renderApp('/refuels/create')
+    expect(await screen.findByLabelText('Gallons')).toHaveAccessibleDescription(
+      /^gal/,
+    )
+    expect(screen.getByLabelText('Amount')).toHaveAccessibleDescription(/^\$/)
+    expect(
+      screen.getByRole('textbox', { name: /Odometer reading/ }),
+    ).toHaveAccessibleDescription('mi')
+  })
+})
+
+describe('charges of electric cars', () => {
+  const electric: Car = {
+    ...car,
+    id: '22222222-2222-2222-2222-222222222229',
+    name: 'ID.3',
+    fuel: 'electric',
+  }
+  const charge: Refuel = {
+    ...refuel,
+    id: '33333333-3333-3333-3333-333333333339',
+    carId: electric.id,
+    station: 'Wallbox',
+    fuel: 'home',
+    quantity: '40',
+    amount: '14',
+    unitPrice: '0.35',
+    consumption: '17.2',
+  }
+  // Wraps the backend to capture the created refuel or reject it.
+  function intercept(reject?: Record<string, string>) {
+    const inner = globalThis.fetch
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string, init?: RequestInit) => {
+        if (init?.method === 'POST' && path === '/api/v1/refuels') {
+          bodies.push(JSON.parse(String(init.body)))
+          if (reject)
+            return response(
+              {
+                code: 'validation_failed',
+                message: 'rejected',
+                fields: reject,
+              },
+              400,
+            )
+        }
+        return inner(path, init)
+      }),
+    )
+    return bodies
+  }
+
+  it('offers charging types and kWh for an electric car', async () => {
+    backend([refuel], [car, electric])
+    const bodies = intercept()
+    const user = userEvent.setup()
+    renderApp(`/refuels/create?carId=${electric.id}`)
+
+    const type = await screen.findByRole('combobox', { name: 'Charging type' })
+    expect(
+      within(type)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Home', 'AC', 'DC fast', 'Other'])
+    expect(type).toHaveValue('ac')
+    const quantity = screen.getByLabelText('Kilowatt-hours')
+    expect(quantity).toHaveAccessibleDescription(/^kWh/)
+
+    await user.selectOptions(type, 'dc')
+    await user.type(screen.getByLabelText('Station'), 'Ionity')
+    await user.type(quantity, '40')
+    await user.type(screen.getByLabelText('Amount'), '28')
+    await user.click(screen.getByRole('button', { name: 'Add refuel' }))
+    await screen.findByRole('heading', { name: 'Refuels' })
+    expect(bodies[0]).toMatchObject({ fuel: 'dc', quantity: '40' })
+  })
+
+  it('resets an unfitting subtype when switching car, keeping other', async () => {
+    backend([refuel], [car, electric])
+    const user = userEvent.setup()
+    renderApp(`/refuels/create?carId=${car.id}`)
+
+    const fuel = await screen.findByRole('combobox', { name: 'Fuel' })
+    await user.selectOptions(fuel, 'special')
+    await user.selectOptions(screen.getByLabelText('Car'), electric.id)
+    expect(screen.getByRole('combobox', { name: 'Charging type' })).toHaveValue(
+      'ac',
+    )
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Charging type' }),
+      'other',
+    )
+    await user.selectOptions(screen.getByLabelText('Car'), car.id)
+    expect(screen.getByRole('combobox', { name: 'Fuel' })).toHaveValue('other')
+    expect(screen.getByLabelText('Litres')).toBeInTheDocument()
+  })
+
+  it('shows a fuel_mismatch rejection at the subtype field', async () => {
+    backend([refuel], [car, electric])
+    intercept({ fuel: 'fuel_mismatch' })
+    const user = userEvent.setup()
+    renderApp(`/refuels/create?carId=${electric.id}`)
+
+    await user.type(await screen.findByLabelText('Station'), 'Ionity')
+    await user.type(screen.getByLabelText('Kilowatt-hours'), '40')
+    await user.type(screen.getByLabelText('Amount'), '28')
+    await user.click(screen.getByRole('button', { name: 'Add refuel' }))
+    expect(
+      await screen.findByText(
+        "This type does not fit the car's fuel. Choose one of the options.",
+      ),
+    ).toHaveAttribute('id', 'refuel-fuel-error')
+  })
+
+  it('offers the charging types when editing a charge', async () => {
+    backend([charge], [car, electric])
+    const inner = globalThis.fetch
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string, init?: RequestInit) =>
+        path === `/api/v1/refuels/${refuel.id}`
+          ? response(charge)
+          : inner(path, init),
+      ),
+    )
+    renderApp(`/refuels/${refuel.id}/edit`)
+
+    const type = await screen.findByRole('combobox', { name: 'Charging type' })
+    expect(type).toHaveValue('home')
+    expect(screen.getByLabelText('Kilowatt-hours')).toHaveValue('40')
+  })
+
+  it("labels each row of a mixed list in its car's unit", async () => {
+    backend([refuel, charge], [car, electric])
+    renderApp('/refuels')
+
+    const table = await screen.findByRole('table', { name: 'Your refuels' })
+    const rows = within(table).getAllByRole('row')
+    const row = (station: string) =>
+      rows.find((candidate) => candidate.textContent?.includes(station))
+    expect(row('Fuel')).toHaveTextContent('40 l')
+    expect(row('Fuel')).toHaveTextContent('€1.500/l')
+    expect(row('Wallbox')).toHaveTextContent('40 kWh')
+    expect(row('Wallbox')).toHaveTextContent('€0.350/kWh')
+    expect(row('Wallbox')).toHaveTextContent('17.2 kWh/100 km')
+  })
+
+  it('labels charging types in German', async () => {
+    await i18n.changeLanguage('de')
+    backend([refuel], [car, electric])
+    renderApp(`/refuels/create?carId=${electric.id}`)
+
+    const type = await screen.findByRole('combobox', { name: 'Ladeart' })
+    expect(
+      within(type)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Zuhause', 'AC', 'DC-Schnellladen', 'Sonstiges'])
+    expect(screen.getByLabelText('Kilowattstunden')).toBeInTheDocument()
   })
 })

@@ -9,6 +9,8 @@ export type ApiErrorBody = components['schemas']['Error']
 export type Session = components['schemas']['Session']
 export type Profile = components['schemas']['Profile']
 export type ProfileUpdate = components['schemas']['ProfileUpdate']
+export type VolumeUnit = components['schemas']['VolumeUnit']
+export type DistanceUnit = components['schemas']['DistanceUnit']
 export type MagicLinkRequest = components['schemas']['MagicLinkRequest']
 export type AuthenticationMethods =
   components['schemas']['AuthenticationMethods']
@@ -67,7 +69,31 @@ export const expenseKinds: readonly ExpenseKind[] = [
   'repair',
   'ticket',
 ]
-export const refuelFuels: readonly RefuelFuel[] = ['normal', 'special', 'other']
+export const refuelFuels: readonly RefuelFuel[] = [
+  'normal',
+  'special',
+  'home',
+  'ac',
+  'dc',
+  'other',
+]
+
+// The refuel subtypes a car accepts: charging subtypes for an electric car,
+// fuel grades for every other car; `other` fits both. The backend rejects
+// any other combination with `fuel_mismatch`.
+const fuelGrades: readonly RefuelFuel[] = ['normal', 'special', 'other']
+const chargeTypes: readonly RefuelFuel[] = ['home', 'ac', 'dc', 'other']
+
+export function refuelFuelsFor(
+  carFuel: CarFuel | undefined,
+): readonly RefuelFuel[] {
+  return carFuel === 'electric' ? chargeTypes : fuelGrades
+}
+
+// The subtype preselected for a new refuel of a car with this fuel.
+export function defaultRefuelFuel(carFuel: CarFuel | undefined): RefuelFuel {
+  return carFuel === 'electric' ? 'ac' : 'normal'
+}
 
 export const repairTypes: readonly RepairType[] = [
   'check',
@@ -81,6 +107,10 @@ export const ticketTypes: readonly TicketType[] = [
   'velocity',
   'other',
 ]
+
+export const volumeUnits: readonly VolumeUnit[] = ['liter', 'gallon']
+
+export const distanceUnits: readonly DistanceUnit[] = ['kilometer', 'mile']
 
 export const carFuels: readonly CarFuel[] = [
   'gasoline',
@@ -114,9 +144,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isProfile(value: unknown): value is Profile {
   if (!isRecord(value)) return false
-  const { id, email, firstName, lastName } = value
-  return [id, email, firstName, lastName].every(
-    (field) => typeof field === 'string',
+  const { id, email, firstName, lastName, currency } = value
+  return (
+    [id, email, firstName, lastName].every(
+      (field) => typeof field === 'string',
+    ) &&
+    typeof currency === 'string' &&
+    /^[A-Z]{3}$/.test(currency) &&
+    volumeUnits.some((unit) => unit === value.volumeUnit) &&
+    distanceUnits.some((unit) => unit === value.distanceUnit)
   )
 }
 
@@ -143,6 +179,7 @@ function isCar(value: unknown): value is Car {
     carFuels.some((fuel) => fuel === value.fuel) &&
     typeof value.isActive === 'boolean' &&
     isCount(value.attachmentCount) &&
+    isCount(value.refuelCount) &&
     [
       value.firstRegistration,
       value.licensePlate,
@@ -228,9 +265,9 @@ function isRefuel(value: unknown): value is Refuel {
       value.carId,
       value.date,
       value.station,
-      value.liters,
+      value.quantity,
       value.amount,
-      value.perLiter,
+      value.unitPrice,
     ].every((v) => typeof v === 'string') &&
     refuelFuels.some((fuel) => fuel === value.fuel) &&
     isCount(value.attachmentCount) &&

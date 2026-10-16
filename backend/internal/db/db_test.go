@@ -69,8 +69,8 @@ func TestRunMigrations(t *testing.T) {
 	if err := sqlDB.QueryRow("SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("query schema_migrations: %v", err)
 	}
-	if version != 8 {
-		t.Errorf("schema_migrations.version = %d, want 8", version)
+	if version != 10 {
+		t.Errorf("schema_migrations.version = %d, want 10", version)
 	}
 	if dirty {
 		t.Errorf("schema_migrations.dirty = true, want false")
@@ -112,6 +112,7 @@ func TestDomainSchema(t *testing.T) {
 
 	assertSchemaObjects(t, sqlDB)
 	accountID := insertAccount(t, sqlDB, "driver@example.com")
+	assertAccountDisplaySettings(t, sqlDB, accountID)
 	assertRejected(t, sqlDB, "INSERT INTO oidc_login_attempts (state_digest, nonce, pkce_verifier, return_to, expires_at) VALUES (decode('00','hex'), 'nonce', 'verifier', '/', now() + interval '1 minute')")
 	assertRejected(t, sqlDB, "INSERT INTO magic_link_challenges (token_digest, email, return_to, expires_at) VALUES (decode('00','hex'), 'other@example.com', '/', now() + interval '1 minute')")
 	assertRejected(t, sqlDB, "INSERT INTO accounts (email) VALUES ('DRIVER@example.com')")
@@ -141,7 +142,7 @@ func assertSchemaObjects(t *testing.T, sqlDB *sql.DB) {
 		}
 	}
 
-	for enumName, wantValues := range map[string]int{"vehicle_fuel": 4, "refuel_fuel": 3, "repair_type": 4, "ticket_type": 3} {
+	for enumName, wantValues := range map[string]int{"vehicle_fuel": 4, "refuel_fuel": 6, "repair_type": 4, "ticket_type": 3} {
 		var got int
 		if err := sqlDB.QueryRow("SELECT count(*) FROM pg_enum JOIN pg_type ON pg_type.oid = pg_enum.enumtypid WHERE pg_type.typname = $1", enumName).Scan(&got); err != nil {
 			t.Fatalf("count %s values: %v", enumName, err)
@@ -212,6 +213,27 @@ func insertAccount(t *testing.T, sqlDB *sql.DB, email string) string {
 	return id
 }
 
+func assertAccountDisplaySettings(t *testing.T, sqlDB *sql.DB, accountID string) {
+	t.Helper()
+	var currency, volumeUnit, distanceUnit string
+	if err := sqlDB.QueryRow("SELECT currency, volume_unit, distance_unit FROM accounts WHERE id = $1", accountID).Scan(&currency, &volumeUnit, &distanceUnit); err != nil {
+		t.Fatalf("read account display settings: %v", err)
+	}
+	if currency != "EUR" || volumeUnit != "liter" || distanceUnit != "kilometer" {
+		t.Errorf("display settings = %s/%s/%s, want EUR/liter/kilometer", currency, volumeUnit, distanceUnit)
+	}
+	if _, err := sqlDB.Exec("UPDATE accounts SET currency = 'USD', volume_unit = 'gallon', distance_unit = 'mile' WHERE id = $1", accountID); err != nil {
+		t.Errorf("set valid display settings: %v", err)
+	}
+	assertRejected(t, sqlDB, "UPDATE accounts SET currency = 'usd' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET currency = 'EURO' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET volume_unit = 'barrel' WHERE id = $1", accountID)
+	assertRejected(t, sqlDB, "UPDATE accounts SET distance_unit = 'furlong' WHERE id = $1", accountID)
+	if _, err := sqlDB.Exec("UPDATE accounts SET currency = DEFAULT, volume_unit = DEFAULT, distance_unit = DEFAULT WHERE id = $1", accountID); err != nil {
+		t.Errorf("reset display settings: %v", err)
+	}
+}
+
 func insertCar(t *testing.T, sqlDB *sql.DB, accountID string) string {
 	t.Helper()
 	var id string
@@ -260,13 +282,19 @@ func assertDeregistrationAndInformation(t *testing.T, sqlDB *sql.DB, accountID s
 func assertNullableOdometerAndNumericChecks(t *testing.T, sqlDB *sql.DB, carID string) {
 	t.Helper()
 	var odometer sql.NullInt64
-	if err := sqlDB.QueryRow("INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'Station', 'normal', 20.5, 50.2) RETURNING odometer_reading", carID).Scan(&odometer); err != nil {
+	if err := sqlDB.QueryRow("INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'normal', 20.5, 50.2) RETURNING odometer_reading", carID).Scan(&odometer); err != nil {
 		t.Fatalf("insert refuel without odometer: %v", err)
 	}
 	if odometer.Valid {
 		t.Error("refuel odometer is present, want NULL")
 	}
-	assertRejected(t, sqlDB, "INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'Station', 'normal', 0, 50.2)", carID)
+	assertRejected(t, sqlDB, "INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'normal', 0, 50.2)", carID)
+	for _, fuel := range []string{"home", "ac", "dc"} {
+		if _, err := sqlDB.Exec("INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Wallbox', $2, 40, 14)", carID, fuel); err != nil {
+			t.Errorf("insert refuel with charging subtype %s: %v", fuel, err)
+		}
+	}
+	assertRejected(t, sqlDB, "INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'premium', 20, 30)", carID)
 	assertRejected(t, sqlDB, "INSERT INTO repairs (car_id, date, station, type, amount) VALUES ($1, now(), 'Garage', 'service', -1)", carID)
 }
 
@@ -323,7 +351,7 @@ func assertCarDeleteCascades(t *testing.T, sqlDB *sql.DB, carID string) {
 func assertAttachments(t *testing.T, sqlDB *sql.DB, accountID, carID string) {
 	t.Helper()
 	var refuelID, ticketID string
-	if err := sqlDB.QueryRow("INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'Station', 'normal', 10, 20) RETURNING id", carID).Scan(&refuelID); err != nil {
+	if err := sqlDB.QueryRow("INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'Station', 'normal', 10, 20) RETURNING id", carID).Scan(&refuelID); err != nil {
 		t.Fatalf("insert refuel: %v", err)
 	}
 	if err := sqlDB.QueryRow("INSERT INTO tickets (car_id, date, type, location, amount) VALUES ($1, now(), 'parking', 'Linz', 5) RETURNING id", carID).Scan(&ticketID); err != nil {

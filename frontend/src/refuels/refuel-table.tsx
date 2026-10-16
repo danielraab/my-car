@@ -1,37 +1,35 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import type { Car, Refuel } from '#/api/client'
+import type { Car, CarFuel, Refuel } from '#/api/client'
 import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
-import { carLabel, formatAmount } from '#/cars/format'
+import { carLabel } from '#/cars/format'
+import { useUnitFormat } from '#/lib/display-units'
 import { formatInstantDate } from '#/repairs/format'
 
-function formatNumber(value: string, locale: string, fractionDigits: number) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return value
-  return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: fractionDigits,
-  }).format(number)
-}
-
 // The refuels table shared by /refuels and a car's Expenses tab. Leaving out
-// cars hides the car column. Consumption comes from derived, the chart
-// series, because a table page may not hold each row's predecessor. A total
-// adds a footer row summing the amounts.
+// cars hides the car column; carFuel then gives the one car's fuel. Each
+// row's quantity, unit price and consumption carry the unit of its car (kWh
+// for an electric car), so the headers name none. Consumption comes from
+// derived, the chart series, because a table page may not hold each row's
+// predecessor. A total adds a footer row summing the amounts.
 export function RefuelTable({
   items,
   derived,
   cars,
+  carFuel,
   total,
 }: {
   items: Refuel[]
   derived: Map<string, Refuel>
   cars?: Map<string, Car>
+  carFuel?: CarFuel
   total?: number
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
+  const units = useUnitFormat()
   const showCar = cars !== undefined
 
   return (
@@ -44,13 +42,13 @@ export function RefuelTable({
             {showCar ? <th scope="col">{t('refuels.fields.car')}</th> : null}
             <th scope="col">{t('refuels.fields.station')}</th>
             <th scope="col" className="numeric">
-              {t('refuels.odometerColumn')}
+              {units.odometerColumn}
             </th>
             <th scope="col" className="numeric">
-              {t('refuels.fields.liters')}
+              {t('refuels.fields.quantity')}
             </th>
             <th scope="col" className="numeric">
-              {t('refuels.fields.perLiter')}
+              {t('refuels.fields.unitPrice')}
             </th>
             <th scope="col" className="numeric">
               {t('refuels.fields.amount')}
@@ -66,6 +64,9 @@ export function RefuelTable({
         <tbody>
           {items.map((refuel) => {
             const consumption = derived.get(refuel.id)?.consumption
+            const quantity = units.quantity(
+              cars?.get(refuel.carId)?.fuel ?? carFuel,
+            )
             return (
               <tr
                 key={refuel.id}
@@ -93,29 +94,17 @@ export function RefuelTable({
                 <td className="numeric">
                   {refuel.odometerReading === null
                     ? t('refuels.notRecorded')
-                    : t('refuels.odometerValue', {
-                        value: new Intl.NumberFormat(locale).format(
-                          refuel.odometerReading,
-                        ),
-                      })}
+                    : units.distance(refuel.odometerReading)}
                 </td>
+                <td className="numeric">{quantity.value(refuel.quantity)}</td>
                 <td className="numeric">
-                  {t('refuels.litersValue', {
-                    value: formatNumber(refuel.liters, locale, 2),
-                  })}
+                  {quantity.unitPrice(refuel.unitPrice)}
                 </td>
-                <td className="numeric">
-                  {formatNumber(refuel.perLiter, locale, 3)}
-                </td>
-                <td className="numeric">
-                  {formatAmount(refuel.amount, locale)}
-                </td>
+                <td className="numeric">{units.money(refuel.amount)}</td>
                 <td className="numeric">
                   {consumption == null
                     ? '—'
-                    : t('refuels.consumptionValue', {
-                        value: formatNumber(consumption, locale, 2),
-                      })}
+                    : quantity.consumption(consumption)}
                 </td>
                 <td className="attachment-cell">
                   <AttachmentIndicator
@@ -131,7 +120,7 @@ export function RefuelTable({
           <tfoot>
             <tr>
               <td colSpan={showCar ? 6 : 5}>{t('refuels.total')}</td>
-              <td className="numeric">{formatAmount(String(total), locale)}</td>
+              <td className="numeric">{units.money(total)}</td>
               <td />
               <td />
             </tr>

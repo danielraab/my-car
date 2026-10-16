@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import type { ExpenseFilter } from '#/api/client'
+import type { CarFuel, ExpenseFilter } from '#/api/client'
 import {
   refuelChartQueryOptions,
   refuelsListQueryOptions,
@@ -19,8 +19,10 @@ import { ExpenseSection } from './expense-section'
 // The car's refuels, repairs and tickets within the filter's range.
 export function CarExpenses({
   filter,
+  carFuel,
 }: {
   filter: ExpenseFilter & { carId: string }
+  carFuel: CarFuel
 }) {
   const { t } = useTranslation()
   const refuels = useInfiniteQuery(refuelsListQueryOptions(filter))
@@ -50,7 +52,9 @@ export function CarExpenses({
           </Link>
         }
       >
-        {(items) => <RefuelTable items={items} derived={derived} />}
+        {(items) => (
+          <RefuelTable items={items} derived={derived} carFuel={carFuel} />
+        )}
       </ExpenseSection>
       <ExpenseSection
         kind="repairs"

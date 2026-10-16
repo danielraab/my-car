@@ -278,7 +278,7 @@ func AccountFromContext(ctx context.Context) (Account, bool) {
 func (s *Service) getSession(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(sessionContextKey{}).(authenticatedSession).Session
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"profile": map[string]string{"id": session.ID, "email": session.Email, "firstName": session.FirstName, "lastName": session.LastName}})
+	_ = json.NewEncoder(w).Encode(map[string]any{"profile": session.Profile()})
 }
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	authenticated := r.Context().Value(sessionContextKey{}).(authenticatedSession)

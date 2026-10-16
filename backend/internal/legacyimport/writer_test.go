@@ -100,7 +100,7 @@ func TestWriteImportsIntoFreshDatabase(t *testing.T) {
 		t.Fatalf("refuels on the wrong account: %d, %v", misowned, err)
 	}
 	var amount, liters string
-	if err := pool.QueryRow(ctx, `SELECT amount::text, liters::text FROM refuels WHERE station = 'O''Neill''s Fuel'`).Scan(&amount, &liters); err != nil || amount != "72.31" || liters != "45.2" {
+	if err := pool.QueryRow(ctx, `SELECT amount::text, quantity::text FROM refuels WHERE station = 'O''Neill''s Fuel'`).Scan(&amount, &liters); err != nil || amount != "72.31" || liters != "45.2" {
 		t.Fatalf("refuel decimals = %s %s, %v", amount, liters, err)
 	}
 

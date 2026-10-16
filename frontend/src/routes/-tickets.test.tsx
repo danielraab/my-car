@@ -12,11 +12,15 @@ const profile = {
   email: 'driver@example.com',
   firstName: 'Ada',
   lastName: 'Lovelace',
+  currency: 'EUR',
+  volumeUnit: 'liter',
+  distanceUnit: 'kilometer',
 }
 
 const golf: Car = {
   id: '9b0a5f0e-5d8f-4a55-9d59-0b8f1f3c2a10',
   attachmentCount: 0,
+  refuelCount: 0,
   type: 'Hatchback',
   make: 'VW',
   name: 'Golf',
@@ -480,7 +484,7 @@ describe('ticket creation', () => {
     expect(amount).toHaveAttribute('aria-invalid', 'true')
     expect(amount).toHaveAttribute(
       'aria-describedby',
-      'ticket-amount-hint ticket-amount-error',
+      'ticket-amount-unit ticket-amount-hint ticket-amount-error',
     )
     expect(screen.getByRole('combobox', { name: 'Location' })).toHaveValue(
       'A1 Linz',

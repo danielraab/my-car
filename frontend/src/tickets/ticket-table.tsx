@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { Car, Ticket } from '#/api/client'
 import { AttachmentIndicator } from '#/attachments/attachment-indicator'
 import { CarStateBadge, carRowClass } from '#/cars/car-state-badge'
-import { carLabel, formatAmount } from '#/cars/format'
+import { carLabel } from '#/cars/format'
+import { useUnitFormat } from '#/lib/display-units'
 import { formatDateTime } from '#/repairs/format'
 
 // The tickets table shared by /tickets and a car's Expenses tab. Leaving out
@@ -21,6 +22,7 @@ export function TicketTable({
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
+  const units = useUnitFormat()
   const showCar = cars !== undefined
 
   return (
@@ -67,7 +69,7 @@ export function TicketTable({
               ) : null}
               <td>{t(`tickets.types.${ticket.type}`)}</td>
               <td className="wrap">{ticket.location}</td>
-              <td className="numeric">{formatAmount(ticket.amount, locale)}</td>
+              <td className="numeric">{units.money(ticket.amount)}</td>
               <td className="attachment-cell">
                 <AttachmentIndicator
                   owner={{ kind: 'tickets', id: ticket.id }}
@@ -81,7 +83,7 @@ export function TicketTable({
           <tfoot>
             <tr>
               <td colSpan={showCar ? 4 : 3}>{t('tickets.total')}</td>
-              <td className="numeric">{formatAmount(String(total), locale)}</td>
+              <td className="numeric">{units.money(total)}</td>
               <td />
             </tr>
           </tfoot>

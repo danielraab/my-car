@@ -9,7 +9,7 @@ import { AttachmentOverview } from '#/attachments/attachment-indicator'
 import { CarConsumption } from '#/cars/car-consumption'
 import { CarExpenses } from '#/cars/car-expenses'
 import { CarStatus } from '#/cars/car-status'
-import { formatAmount, formatDate } from '#/cars/format'
+import { formatDate } from '#/cars/format'
 import { carQueryOptions } from '#/cars/queries'
 import { DateRangeControl } from '#/components/date-range-control'
 import {
@@ -17,6 +17,7 @@ import {
   defaultFrom,
   isCalendarDate,
 } from '#/lib/date-range'
+import { useUnitFormat } from '#/lib/display-units'
 
 const tabs = ['details', 'expenses', 'consumption'] as const
 type CarTab = (typeof tabs)[number]
@@ -124,10 +125,10 @@ function CarView({ car }: { car: Car }) {
             <CarDetails car={car} />
           </TabPanel>
           <TabPanel>
-            <CarExpenses filter={filter} />
+            <CarExpenses filter={filter} carFuel={car.fuel} />
           </TabPanel>
           <TabPanel>
-            <CarConsumption filter={filter} />
+            <CarConsumption filter={filter} carFuel={car.fuel} />
           </TabPanel>
         </TabPanels>
       </TabGroup>
@@ -138,6 +139,7 @@ function CarView({ car }: { car: Car }) {
 function CarDetails({ car }: { car: Car }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? 'en'
+  const units = useUnitFormat()
   const notRecorded = t('cars.notRecorded')
   const details: [string, string][] = [
     ['type', car.type],
@@ -160,9 +162,7 @@ function CarDetails({ car }: { car: Car }) {
     ],
     [
       'purchasePrice',
-      car.purchasePrice === null
-        ? notRecorded
-        : formatAmount(car.purchasePrice, locale),
+      car.purchasePrice === null ? notRecorded : units.money(car.purchasePrice),
     ],
     [
       'isActive',

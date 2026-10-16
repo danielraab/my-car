@@ -340,10 +340,14 @@ paths:
       tags:
       - Profile
       operationId: updateMe
-      description: Updates the caller's first and/or last name. Names are trimmed
-        and may be empty. The email address is read-only; a body containing
-        `email` is rejected with `400` and a `read_only` reason for `email`,
-        and nothing is applied.
+      description: Updates the caller's first and/or last name and display
+        settings (currency, volume unit, distance unit). Names are trimmed
+        and may be empty. A currency that is not a known ISO 4217 code, or a
+        unit outside its enum, is rejected with an `invalid_enum` reason.
+        Changing a display setting only relabels values; no stored amount,
+        volume or distance is converted. The email address is read-only; a
+        body containing `email` is rejected with `400` and a `read_only`
+        reason for `email`, and nothing is applied.
       requestBody:
         required: true
         content:
@@ -429,6 +433,10 @@ paths:
       tags:
       - Cars
       operationId: updateCar
+      description: Applies every supplied member. Changing `fuel` to or from
+        `electric` while the car has refuels is rejected with `400` and
+        `fields.fuel` set to `fuel_locked`; changes among `diesel`,
+        `gasoline` and `other` are always allowed.
       requestBody:
         required: true
         content:
@@ -476,8 +484,9 @@ paths:
       - $ref: '#/components/parameters/To'
       responses:
         '200':
-          description: The caller's refuels ordered by date then ID. A `carId`
-            that names no car of the caller's yields an empty page.
+          description: The caller's refuels, newest first (by date then ID,
+            both descending). A `carId` that names no car of the caller's
+            yields an empty page.
           content:
             application/json:
               schema:
@@ -564,8 +573,9 @@ paths:
       - $ref: '#/components/parameters/To'
       responses:
         '200':
-          description: The caller's repairs ordered by date then ID. A `carId`
-            that names no car of the caller's yields an empty page.
+          description: The caller's repairs, newest first (by date then ID,
+            both descending). A `carId` that names no car of the caller's
+            yields an empty page.
           content:
             application/json:
               schema:
@@ -631,8 +641,9 @@ paths:
       - $ref: '#/components/parameters/To'
       responses:
         '200':
-          description: The caller's tickets ordered by date then ID. A `carId`
-            that names no car of the caller's yields an empty page.
+          description: The caller's tickets, newest first (by date then ID,
+            both descending). A `carId` that names no car of the caller's
+            yields an empty page.
           content:
             application/json:
               schema:
@@ -1556,8 +1567,12 @@ components:
             blank after trimming), `invalid_enum` (not one of the documented
             codes), `invalid_date` (not an RFC 3339 full-date),
             `invalid_decimal` (not a decimal string), `negative` (a
-            numeric value below zero), and `before_first_registration` (a
-            deregistration date earlier than the car's first registration).
+            numeric value below zero), `non_positive` (a numeric value that
+            must be greater than zero), `before_first_registration` (a
+            deregistration date earlier than the car's first registration),
+            `fuel_mismatch` (a refuel subtype that does not fit the car's
+            fuel), and `fuel_locked` (a car fuel change to or from `electric`
+            while the car has refuels).
           additionalProperties:
             type: string
     Profile:
@@ -1567,6 +1582,9 @@ components:
       - email
       - firstName
       - lastName
+      - currency
+      - volumeUnit
+      - distanceUnit
       properties:
         id:
           $ref: '#/components/schemas/UUID'
@@ -1577,6 +1595,33 @@ components:
           type: string
         lastName:
           type: string
+        currency:
+          $ref: '#/components/schemas/Currency'
+        volumeUnit:
+          $ref: '#/components/schemas/VolumeUnit'
+        distanceUnit:
+          $ref: '#/components/schemas/DistanceUnit'
+    Currency:
+      type: string
+      pattern: ^[A-Z]{3}$
+      description: >-
+        The account's currency as an ISO 4217 alphabetic code. It only labels
+        amounts; stored amounts are never converted when it changes.
+      examples:
+      - EUR
+    VolumeUnit:
+      type: string
+      enum: [liter, gallon]
+      description: >-
+        The unit the account's refuel volumes are recorded and shown in. It
+        only labels values; stored volumes are never converted when it changes.
+    DistanceUnit:
+      type: string
+      enum: [kilometer, mile]
+      description: >-
+        The unit the account's odometer readings and distances are recorded
+        and shown in. It only labels values; stored readings are never
+        converted when it changes.
     ProfileUpdate:
       type: object
       minProperties: 1
@@ -1588,6 +1633,12 @@ components:
         lastName:
           type: string
           maxLength: 100
+        currency:
+          $ref: '#/components/schemas/Currency'
+        volumeUnit:
+          $ref: '#/components/schemas/VolumeUnit'
+        distanceUnit:
+          $ref: '#/components/schemas/DistanceUnit'
     Session:
       type: object
       required:
@@ -1849,6 +1900,7 @@ components:
       required:
       - id
       - attachmentCount
+      - refuelCount
       - type
       - make
       - name
@@ -1871,6 +1923,11 @@ components:
           minimum: 0
           readOnly: true
           description: Number of attachments of this entry.
+        refuelCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Number of refuels of this car. While it is above zero, the car's fuel cannot be changed to or from `electric`.
         type:
           type: string
         make:
@@ -1948,7 +2005,7 @@ components:
       - date
       - station
       - fuel
-      - liters
+      - quantity
       - amount
       properties:
         carId:
@@ -1959,17 +2016,23 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
           minimum: 0
         fuel:
           type: string
+          description: "Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason."
           enum:
           - normal
           - special
+          - home
+          - ac
+          - dc
           - other
-        liters:
+        quantity:
+          description: "Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
@@ -1984,17 +2047,23 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
           minimum: 0
         fuel:
           type: string
+          description: "Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason."
           enum:
           - normal
           - special
+          - home
+          - ac
+          - dc
           - other
-        liters:
+        quantity:
+          description: "Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
@@ -2008,9 +2077,9 @@ components:
       - station
       - odometerReading
       - fuel
-      - liters
+      - quantity
       - amount
-      - perLiter
+      - unitPrice
       - distance
       - consumption
       properties:
@@ -2029,25 +2098,37 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
           minimum: 0
         fuel:
           type: string
-          enum: [normal, special, other]
-        liters:
+          description: "Refuel subtype. `normal`, `special` and `other` are allowed for a non-electric car; `home`, `ac`, `dc` and `other` for an electric car. A subtype that does not fit the car's fuel is rejected with a `fuel_mismatch` reason."
+          enum:
+          - normal
+          - special
+          - home
+          - ac
+          - dc
+          - other
+        quantity:
+          description: "Quantity in kWh when the car's fuel is `electric`, otherwise in the account's volume unit (`volumeUnit`); never converted when that setting changes."
           $ref: '#/components/schemas/Decimal'
         amount:
           $ref: '#/components/schemas/Decimal'
-        perLiter:
+        unitPrice:
+          description: "Amount divided by `quantity`: the price per kWh for an electric car, otherwise per unit of the account's volume unit, in the account's currency."
           $ref: '#/components/schemas/Decimal'
         distance:
+          description: "Distance since the car's previous refuel, in the account's distance unit."
           type:
           - integer
           - 'null'
           minimum: 0
         consumption:
+          description: "Quantity per 100 distance units: kWh for an electric car, otherwise the account's volume unit, per 100 of the account's distance unit (for example l/100 km, gal/100 mi or kWh/100 km)."
           type:
           - string
           - 'null'
@@ -2080,6 +2161,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -2106,6 +2188,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'
@@ -2151,6 +2234,7 @@ components:
         station:
           type: string
         odometerReading:
+          description: "Odometer reading in the account's distance unit (`distanceUnit`); never converted when that setting changes."
           type:
           - integer
           - 'null'

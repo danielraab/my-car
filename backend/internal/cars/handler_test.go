@@ -525,3 +525,24 @@ func TestAttachmentCountIsReadOnly(t *testing.T) {
 		t.Fatalf("car body = %v, want attachmentCount 0", body)
 	}
 }
+
+func TestRefuelCountIsReadOnlyAndFuelLockIsReported(t *testing.T) {
+	for _, req := range []struct{ method, target string }{{http.MethodPost, "/api/v1/cars"}, {http.MethodPatch, "/api/v1/cars/" + carID}} {
+		repo := &fakeRepository{}
+		rec := serve(t, repo, passSession, req.method, req.target, `{"type":"Car","make":"VW","name":"Golf","fuel":"diesel","refuelCount":3}`)
+		fields, _ := decodeMap(t, rec)["fields"].(map[string]any)
+		if rec.Code != http.StatusBadRequest || fields["refuelCount"] != apierror.ReasonUnknown || repo.calls != 0 {
+			t.Fatalf("%s: status = %d, body = %s; want 400 with refuelCount unknown", req.method, rec.Code, rec.Body)
+		}
+	}
+	rec := serve(t, &fakeRepository{}, passSession, http.MethodGet, "/api/v1/cars/"+carID, "")
+	if body := decodeMap(t, rec); body["refuelCount"] != float64(0) {
+		t.Fatalf("car body = %v, want refuelCount 0", body)
+	}
+
+	rec = serve(t, &fakeRepository{err: ErrFuelLocked}, passSession, http.MethodPatch, "/api/v1/cars/"+carID, `{"fuel":"electric"}`)
+	fields, _ := decodeMap(t, rec)["fields"].(map[string]any)
+	if rec.Code != http.StatusBadRequest || fields["fuel"] != apierror.ReasonFuelLocked {
+		t.Fatalf("status = %d, body = %s; want 400 with fuel_locked", rec.Code, rec.Body)
+	}
+}

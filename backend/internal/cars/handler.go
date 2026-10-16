@@ -94,6 +94,7 @@ type carBody struct {
 	DeregistrationDate *string `json:"deregistrationDate"`
 	Information        *string `json:"information"`
 	AttachmentCount    int     `json:"attachmentCount"`
+	RefuelCount        int     `json:"refuelCount"`
 	CreatedAt          string  `json:"createdAt"`
 	UpdatedAt          string  `json:"updatedAt"`
 }
@@ -103,7 +104,7 @@ func toBody(c Car) carBody {
 		ID: c.ID, Type: c.Type, Make: c.Make, Name: c.Name, Fuel: c.Fuel,
 		FirstRegistration: c.FirstRegistration, LicensePlate: c.LicensePlate, FIN: c.FIN,
 		IsActive: c.IsActive, PurchaseDate: c.PurchaseDate, PurchasePrice: c.PurchasePrice,
-		DeregistrationDate: c.DeregistrationDate, Information: c.Information, AttachmentCount: c.AttachmentCount,
+		DeregistrationDate: c.DeregistrationDate, Information: c.Information, AttachmentCount: c.AttachmentCount, RefuelCount: c.RefuelCount,
 		CreatedAt: c.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: c.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
@@ -117,6 +118,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err error) {
 	if errors.Is(err, ErrNotFound) {
 		apierror.NotFound(w)
+		return
+	}
+	if errors.Is(err, ErrFuelLocked) {
+		apierror.Validation(w, map[string]string{"fuel": apierror.ReasonFuelLocked})
 		return
 	}
 	if errors.Is(err, ErrDeregistrationBeforeFirstRegistration) {

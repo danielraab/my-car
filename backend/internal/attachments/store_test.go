@@ -58,7 +58,7 @@ func testEntries(t *testing.T, pool *pgxpool.Pool) (accountID string, owners map
 	if err := pool.QueryRow(ctx, `INSERT INTO cars (account_id, type, make, name, fuel) VALUES ($1, 'Car', 'VW', 'Golf', 'diesel') RETURNING id`, accountID).Scan(&carID); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, fuel, liters, amount) VALUES ($1, now(), 'OMV', 'normal', 40, 70) RETURNING id`, carID).Scan(&refuelID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO refuels (car_id, date, station, fuel, quantity, amount) VALUES ($1, now(), 'OMV', 'normal', 40, 70) RETURNING id`, carID).Scan(&refuelID); err != nil {
 		t.Fatal(err)
 	}
 	if err := pool.QueryRow(ctx, `INSERT INTO repairs (car_id, date, station, type, amount) VALUES ($1, now(), 'Garage', 'service', 300) RETURNING id`, carID).Scan(&repairID); err != nil {

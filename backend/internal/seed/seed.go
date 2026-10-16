@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	carsPerAccount    = 4
+	carsPerAccount    = 5
 	refuelsPerAccount = 500
 	repairsPerAccount = 75
 	ticketsPerAccount = 90
@@ -47,6 +47,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, emails []string, now time.Time
 	models := []struct{ make, name, fuel string }{
 		{"Volkswagen", "Golf", "diesel"}, {"Toyota", "Corolla", "gasoline"},
 		{"Skoda", "Octavia", "diesel"}, {"Honda", "Civic", "gasoline"},
+		{"Volkswagen", "ID.3", "electric"},
 	}
 	stations := []string{"Shell", "OMV", "BP", "Avanti", "Jet"}
 	repairTypes := []string{"check", "service", "wearing_part", "crash_repair"}
@@ -70,15 +71,20 @@ func Run(ctx context.Context, pool *pgxpool.Pool, emails []string, now time.Time
 		for i := 0; i < refuelsPerAccount; i++ {
 			car := i % carsPerAccount
 			date := distributedDate(start, now, i, refuelsPerAccount, rng)
-			liters := float64(25+rng.Intn(40)) + float64(rng.Intn(100))/100
+			quantity := float64(25+rng.Intn(40)) + float64(rng.Intn(100))/100
 			price := 1.25 + float64(rng.Intn(85))/100
-			fuel := "normal"
+			station, fuel := stations[i%len(stations)], "normal"
 			if i%7 == 0 {
 				fuel = "special"
 			}
-			_, err := tx.Exec(ctx, `INSERT INTO refuels (car_id, date, station, odometer_reading, fuel, liters, amount)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)`, carIDs[car], date, stations[i%len(stations)],
-				odometer(start, date, car), fuel, liters, float64(int(liters*price*100))/100)
+			if models[car].fuel == "electric" {
+				var charge chargeKind
+				quantity, price, charge = chargeSample(rng)
+				station, fuel = charge.station, charge.fuel
+			}
+			_, err := tx.Exec(ctx, `INSERT INTO refuels (car_id, date, station, odometer_reading, fuel, quantity, amount)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)`, carIDs[car], date, station,
+				odometer(start, date, car), fuel, quantity, float64(int(quantity*price*100))/100)
 			if err != nil {
 				return fmt.Errorf("insert refuel for %s: %w", email, err)
 			}
@@ -107,6 +113,42 @@ func Run(ctx context.Context, pool *pgxpool.Pool, emails []string, now time.Time
 		return fmt.Errorf("commit seed: %w", err)
 	}
 	return nil
+}
+
+// chargeKind is a charging subtype with a typical station and price range
+// per kWh.
+type chargeKind struct {
+	fuel, station      string
+	minPrice, maxPrice float64
+	weight             int
+}
+
+// chargeKinds favour home and AC charging, as most electric driving does.
+var chargeKinds = []chargeKind{
+	{"home", "Home", 0.25, 0.32, 10},
+	{"ac", "Wien Energie", 0.39, 0.55, 5},
+	{"dc", "Ionity", 0.59, 0.79, 4},
+	{"other", "Workplace", 0.25, 0.80, 1},
+}
+
+// chargeSample returns a charge of 15–60 kWh, its price per kWh and kind.
+func chargeSample(rng *rand.Rand) (float64, float64, chargeKind) {
+	total := 0
+	for _, k := range chargeKinds {
+		total += k.weight
+	}
+	pick := rng.Intn(total)
+	kind := chargeKinds[len(chargeKinds)-1]
+	for _, k := range chargeKinds {
+		if pick < k.weight {
+			kind = k
+			break
+		}
+		pick -= k.weight
+	}
+	quantity := float64(15+rng.Intn(45)) + float64(rng.Intn(100))/100
+	price := kind.minPrice + rng.Float64()*(kind.maxPrice-kind.minPrice)
+	return quantity, price, kind
 }
 
 func distributedDate(start, end time.Time, index, total int, rng *rand.Rand) time.Time {

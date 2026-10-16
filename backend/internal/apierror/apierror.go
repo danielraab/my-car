@@ -33,6 +33,12 @@ const (
 	// ReasonBeforeFirstRegistration rejects a deregistration date earlier
 	// than the car's first registration.
 	ReasonBeforeFirstRegistration = "before_first_registration"
+	// ReasonFuelMismatch rejects a refuel subtype that does not fit the
+	// car's fuel (charging subtypes on an electric car, fuel grades otherwise).
+	ReasonFuelMismatch = "fuel_mismatch"
+	// ReasonFuelLocked rejects a car fuel change to or from electric while
+	// the car has refuels.
+	ReasonFuelLocked = "fuel_locked"
 )
 
 // BodyField is the fields key for a problem with the request body as a whole.
